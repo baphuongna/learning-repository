@@ -1,0 +1,61 @@
+// Prisma Schema cho Kho Học Liệu Số (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Model User - Người dùng
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  fullName     String
+  passwordHash String     @map("password_hash")
+  role         String     @default("USER") // ADMIN, USER
+  avatarUrl    String?    @map("avatar_url")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Quan hệ
+  documents    Document[]
+
+  @@map("users")
+}
+
+// Model Document - Tài liệu
+model Document {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Metadata (Dublin Core simplified)
+  title       String
+  description String?
+  author      String?
+  subject     String?
+  keywords    String   // JSON string array
+  language    String   @default("vi")
+
+  // File info
+  fileName    String   @map("file_name")
+  filePath    String   @map("file_path")
+  fileSize    Int?     @map("file_size")
+  mimeType    String?  @map("mime_type")
+
+  // Status
+  status      String   @default("ACTIVE") // ACTIVE, ARCHIVED, DELETED
+  isPublic    Boolean  @default(false) @map("is_public")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Indexes
+  @@index([userId])
+  @@index([status])
+  @@index([isPublic])
+  @@map("documents")
+}
