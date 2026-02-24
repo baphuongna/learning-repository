@@ -30,6 +30,9 @@ export function Header() {
           <Link href="/documents" className="text-sm font-medium hover:text-primary transition-colors">
             Tài liệu
           </Link>
+          <Link href="/my-documents" className="text-sm font-medium hover:text-primary transition-colors">
+            Tài liệu của tôi
+          </Link>
         </nav>
 
         <div className="flex items-center gap-4">
