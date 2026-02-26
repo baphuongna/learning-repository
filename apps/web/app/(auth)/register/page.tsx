@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/app/providers';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, ArrowLeft } from 'lucide-react';
 
 const schema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -137,6 +137,12 @@ export default function RegisterPage() {
               Đăng nhập
             </Link>
           </p>
+          <Link href="/" className="w-full">
+            <Button type="button" variant="outline" className="w-full">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Quay lại Tin tức
+            </Button>
+          </Link>
         </CardFooter>
       </form>
     </Card>

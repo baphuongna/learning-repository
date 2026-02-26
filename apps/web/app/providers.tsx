@@ -23,6 +23,7 @@ interface User {
   email: string;
   fullName: string;
   role: string;
+  avatarUrl?: string;
 }
 
 /**
@@ -34,6 +35,7 @@ interface AuthContextType {
   isLoading: boolean;         // Loading state khi khôi phục session
   login: (token: string, user: User) => void;  // Login function
   logout: () => void;         // Logout function
+  setUser: (user: User) => void;  // Update user function
 }
 
 // ==================== CONTEXT ====================
@@ -134,9 +136,21 @@ export function Providers({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  /**
+   * Update user function
+   *
+   * Cập nhật user info trong state và localStorage
+   *
+   * @param updatedUser - User info mới
+   */
+  const updateUser = (updatedUser: User) => {
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  };
+
   // Provide auth context to children
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, setUser: updateUser }}>
       {children}
     </AuthContext.Provider>
   );

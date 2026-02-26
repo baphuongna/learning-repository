@@ -126,7 +126,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 ## File Upload
 
-Files stored in `apps/api/uploads/`. Max size: 50MB.
+Files stored in `apps/api/uploads/`. Max size: 100MB.
 Supported: PDF, Word, Excel, PowerPoint, Video, Audio, Images.
 
 ## Coding Conventions

@@ -159,6 +159,28 @@ export const authApi = {
     const response = await api.get('/auth/me');
     return response.data;
   },
+
+  /**
+   * Cập nhật thông tin profile
+   *
+   * @param data - { fullName?, avatarUrl? }
+   * @returns User info đã cập nhật
+   */
+  updateProfile: async (data: { fullName?: string; avatarUrl?: string }) => {
+    const response = await api.put('/auth/profile', data);
+    return response.data;
+  },
+
+  /**
+   * Đổi mật khẩu
+   *
+   * @param data - { currentPassword, newPassword }
+   * @returns Message xác nhận
+   */
+  changePassword: async (data: { currentPassword: string; newPassword: string }) => {
+    const response = await api.put('/auth/change-password', data);
+    return response.data;
+  },
 };
 
 // ==================== DOCUMENTS API ====================
@@ -251,5 +273,182 @@ export const documentsApi = {
   search: async (query: string, page = 1, limit = 10): Promise<PaginatedResponse<Document>> => {
     const response = await api.get('/search', { params: { q: query, page, limit } });
     return response.data;
+  },
+};
+
+// ==================== NEWS TYPES ====================
+
+/**
+ * News Category type - Danh mục tin tức
+ */
+export interface NewsCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  order: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { news: number };
+}
+
+/**
+ * News type - Tin tức
+ */
+export interface News {
+  id: string;
+  categoryId: string;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  userId: string;
+  user: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  thumbnailUrl: string | null;
+  isPublished: boolean;
+  isFeatured: boolean;
+  publishedAt: string | null;
+  viewCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==================== CATEGORIES API ====================
+
+/**
+ * Categories API - Các functions liên quan đến danh mục tin tức
+ */
+export const categoriesApi = {
+  /**
+   * Lấy danh sách danh mục (public)
+   */
+  getAll: async (): Promise<NewsCategory[]> => {
+    const response = await api.get('/news-categories');
+    return response.data;
+  },
+
+  /**
+   * Lấy tất cả danh mục (Admin)
+   */
+  getAllAdmin: async (): Promise<NewsCategory[]> => {
+    const response = await api.get('/news-categories/admin');
+    return response.data;
+  },
+
+  /**
+   * Lấy chi tiết danh mục
+   */
+  getById: async (id: string): Promise<NewsCategory> => {
+    const response = await api.get(`/news-categories/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Tạo danh mục mới (Admin)
+   */
+  create: async (data: Partial<NewsCategory>): Promise<NewsCategory> => {
+    const response = await api.post('/news-categories', data);
+    return response.data;
+  },
+
+  /**
+   * Cập nhật danh mục (Admin)
+   */
+  update: async (id: string, data: Partial<NewsCategory>): Promise<NewsCategory> => {
+    const response = await api.put(`/news-categories/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Xóa danh mục (Admin)
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/news-categories/${id}`);
+  },
+};
+
+// ==================== NEWS API ====================
+
+/**
+ * News API - Các functions liên quan đến tin tức
+ */
+export const newsApi = {
+  /**
+   * Lấy danh sách tin tức đã xuất bản (public)
+   */
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    search?: string;
+  }): Promise<PaginatedResponse<News>> => {
+    const response = await api.get('/news', { params });
+    return response.data;
+  },
+
+  /**
+   * Lấy tin tức nổi bật
+   */
+  getFeatured: async (limit = 5): Promise<News[]> => {
+    const response = await api.get('/news/featured', { params: { limit } });
+    return response.data;
+  },
+
+  /**
+   * Lấy chi tiết tin theo slug
+   */
+  getBySlug: async (slug: string): Promise<News> => {
+    const response = await api.get(`/news/slug/${slug}`);
+    return response.data;
+  },
+
+  /**
+   * Lấy chi tiết tin theo ID
+   */
+  getById: async (id: string): Promise<News> => {
+    const response = await api.get(`/news/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Lấy bài viết của tôi
+   */
+  getMy: async (page = 1, limit = 10): Promise<PaginatedResponse<News>> => {
+    const response = await api.get('/news/my', { params: { page, limit } });
+    return response.data;
+  },
+
+  /**
+   * Tạo bài viết mới
+   */
+  create: async (data: Partial<News>): Promise<News> => {
+    const response = await api.post('/news', data);
+    return response.data;
+  },
+
+  /**
+   * Cập nhật bài viết
+   */
+  update: async (id: string, data: Partial<News>): Promise<News> => {
+    const response = await api.put(`/news/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Xóa bài viết
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/news/${id}`);
   },
 };

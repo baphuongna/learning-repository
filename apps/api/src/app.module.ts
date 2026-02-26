@@ -12,6 +12,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { NewsCategoriesModule } from './modules/news-categories/news-categories.module';
+import { NewsModule } from './modules/news/news.module';
 import { PrismaModule } from './common/services/prisma.module';
 
 @Module({
@@ -28,9 +30,11 @@ import { PrismaModule } from './common/services/prisma.module';
     PrismaModule,
 
     // Feature Modules
-    AuthModule,       // Xử lý authentication (login, register, JWT)
-    DocumentsModule,  // CRUD tài liệu
-    UploadModule,     // Upload/Download files
+    AuthModule,           // Xử lý authentication (login, register, JWT)
+    DocumentsModule,      // CRUD tài liệu
+    UploadModule,         // Upload/Download files
+    NewsCategoriesModule, // Quản lý danh mục tin tức
+    NewsModule,           // CRUD tin tức
   ],
 })
 export class AppModule {}

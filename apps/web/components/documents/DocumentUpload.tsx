@@ -114,7 +114,7 @@ export function DocumentUpload() {
                   Kéo thả file hoặc click để chọn
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Hỗ trợ: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, MP4, MP3 (tối đa 50MB)
+                  Hỗ trợ: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, MP4, MP3 (tối đa 100MB)
                 </p>
               </label>
               <input

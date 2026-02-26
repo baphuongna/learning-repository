@@ -13,12 +13,13 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '@/common/services/prisma.service';
-import { RegisterDto, LoginDto } from './dto/register.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, UpdateProfileDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -157,6 +158,83 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * Đổi mật khẩu
+   *
+   * @param userId - ID của user
+   * @param dto - Dữ liệu đổi mật khẩu
+   * @returns Message xác nhận
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    // Lấy user với password hash
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
+
+    // Verify mật khẩu hiện tại
+    const isPasswordValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+
+    // Kiểm tra mật khẩu mới khác mật khẩu cũ
+    const isSamePassword = await bcrypt.compare(dto.newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+    }
+
+    // Hash mật khẩu mới
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    // Cập nhật mật khẩu
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    return { message: 'Đổi mật khẩu thành công' };
+  }
+
+  /**
+   * Cập nhật thông tin profile
+   *
+   * @param userId - ID của user
+   * @param dto - Dữ liệu cập nhật
+   * @returns Thông tin user đã cập nhật
+   */
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
+
+    // Cập nhật thông tin
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName: dto.fullName,
+        avatarUrl: dto.avatarUrl,
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+    });
+
+    return updated;
   }
 
   /**

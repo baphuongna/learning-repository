@@ -22,6 +22,7 @@ model User {
 
   // Quan hệ
   documents    Document[]
+  news         News[]
 
   @@map("users")
 }
@@ -58,4 +59,58 @@ model Document {
   @@index([status])
   @@index([isPublic])
   @@map("documents")
+}
+
+// Model NewsCategory - Danh mục tin tức
+model NewsCategory {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  order       Int      @default(0)
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Quan hệ
+  news        News[]
+
+  @@index([status])
+  @@index([order])
+  @@map("news_categories")
+}
+
+// Model News - Tin tức
+model News {
+  id           String   @id @default(uuid())
+  categoryId   String   @map("category_id")
+  category     NewsCategory @relation(fields: [categoryId], references: [id])
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Content
+  title        String
+  slug         String   @unique
+  summary      String
+  content      String
+  thumbnailUrl String?  @map("thumbnail_url")
+
+  // Status
+  isPublished  Boolean  @default(false) @map("is_published")
+  isFeatured   Boolean  @default(false) @map("is_featured")
+  publishedAt  DateTime? @map("published_at")
+  viewCount    Int      @default(0) @map("view_count")
+  status       String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Indexes
+  @@index([categoryId])
+  @@index([userId])
+  @@index([status])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([publishedAt])
+  @@map("news")
 }

@@ -5,14 +5,16 @@
  * - POST /auth/register - Đăng ký tài khoản mới
  * - POST /auth/login - Đăng nhập
  * - GET /auth/me - Lấy thông tin user hiện tại
+ * - PUT /auth/profile - Cập nhật thông tin profile
+ * - PUT /auth/change-password - Đổi mật khẩu
  *
  * @module AuthController
  */
 
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/register.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, UpdateProfileDto } from './dto/register.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
@@ -74,5 +76,47 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   async getProfile(@CurrentUser('sub') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  /**
+   * Cập nhật thông tin profile
+   *
+   * @param userId - ID của user từ JWT token
+   * @param dto - Dữ liệu cập nhật
+   * @returns Thông tin user đã cập nhật
+   */
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật thông tin profile' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  async updateProfile(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(userId, dto);
+  }
+
+  /**
+   * Đổi mật khẩu
+   *
+   * @param userId - ID của user từ JWT token
+   * @param dto - Dữ liệu đổi mật khẩu
+   * @returns Message xác nhận
+   */
+  @Put('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đổi mật khẩu' })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu hiện tại không đúng' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  async changePassword(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 }
