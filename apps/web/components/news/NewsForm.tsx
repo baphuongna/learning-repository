@@ -154,11 +154,11 @@ export function NewsForm({ news }: NewsFormProps) {
       if (news) {
         // Update existing news
         await newsApi.update(news.id, formData);
-        router.push(`/news/${news.slug}`);
+        router.push('/my-news');
       } else {
         // Create new news
-        const created = await newsApi.create(formData);
-        router.push(`/news/${created.slug}`);
+        await newsApi.create(formData);
+        router.push('/my-news');
       }
     } catch (err: any) {
       console.error('Failed to save news:', err);

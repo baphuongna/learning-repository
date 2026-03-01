@@ -48,6 +48,9 @@ export function Header() {
           <Link href="/my-documents" className="text-sm font-medium hover:text-primary transition-colors">
             Tài liệu của tôi
           </Link>
+          <Link href="/my-news" className="text-sm font-medium hover:text-primary transition-colors">
+            Bài viết của tôi
+          </Link>
           {user?.role === 'ADMIN' && (
             <Link href="/admin/news" className="text-sm font-medium hover:text-primary transition-colors">
               Admin
@@ -99,6 +102,15 @@ export function Header() {
                   >
                     <User className="h-4 w-4" />
                     Thông tin cá nhân
+                  </Link>
+
+                  <Link
+                    href="/my-news"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Bài viết của tôi
                   </Link>
 
                   <Link
