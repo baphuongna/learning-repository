@@ -34,6 +34,11 @@ export class CreateDocumentDto {
   @IsOptional()
   @IsString()
   isPublic?: string; // Chấp nhận string từ multipart/form-data
+
+  @ApiPropertyOptional({ example: 'uuid-folder-id', description: 'ID thư mục chứa tài liệu' })
+  @IsOptional()
+  @IsString()
+  folderId?: string;
 }
 
 export class UpdateDocumentDto {
@@ -67,6 +72,11 @@ export class UpdateDocumentDto {
   @IsOptional()
   @IsString()
   isPublic?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-folder-id', description: 'ID thư mục chứa tài liệu' })
+  @IsOptional()
+  @IsString()
+  folderId?: string;
 }
 
 export class DocumentResponseDto {

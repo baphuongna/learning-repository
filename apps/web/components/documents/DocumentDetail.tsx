@@ -62,12 +62,11 @@ export function DocumentDetail() {
     }
   };
 
-  const formatFileSize = (bytes: string | null) => {
+  const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'N/A';
-    const size = Number(bytes);
-    if (size < 1024) return size + ' B';
-    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
-    return (size / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   const isOwner = user && document && user.id === document.user.id;
@@ -171,7 +170,7 @@ export function DocumentDetail() {
             <div>
               <h4 className="font-medium mb-2">Từ khóa</h4>
               <div className="flex flex-wrap gap-1">
-                {document.keywords.length > 0 ? (
+                {Array.isArray(document.keywords) && document.keywords.length > 0 ? (
                   document.keywords.map((keyword, index) => (
                     <Badge key={index} variant="secondary">
                       {keyword}

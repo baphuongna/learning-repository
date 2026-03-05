@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,7 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { documentsApi } from '@/lib/api';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, Folder as FolderIcon } from 'lucide-react';
+import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
+import { toast } from 'sonner';
 
 const schema = z.object({
   title: z.string().min(1, 'Tiêu đề không được để trống'),
@@ -20,12 +22,14 @@ const schema = z.object({
   subject: z.string().optional(),
   keywords: z.string().optional(),
   isPublic: z.boolean().default(false),
+  folderId: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export function DocumentUpload() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -41,6 +45,7 @@ export function DocumentUpload() {
     resolver: zodResolver(schema),
     defaultValues: {
       isPublic: false,
+      folderId: searchParams.get('folderId') || null,
     },
   });
 
@@ -73,12 +78,17 @@ export function DocumentUpload() {
       formData.append('subject', data.subject || '');
       formData.append('keywords', data.keywords || '');
       formData.append('isPublic', String(data.isPublic));
+      if (data.folderId) {
+        formData.append('folderId', data.folderId);
+      }
 
       await documentsApi.create(formData);
+      toast.success('Tải lên tài liệu thành công!');
       router.push('/documents');
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.response?.data?.message || 'Upload thất bại');
+      toast.error('Tải lên tài liệu thất bại');
     } finally {
       setUploading(false);
     }
@@ -98,6 +108,26 @@ export function DocumentUpload() {
           {error}
         </div>
       )}
+
+      {/* Folder Destination - Hiển thị dạng breadcrumb, không cho thay đổi */}
+      <div>
+        <Label>Thư mục đích</Label>
+        <div className="mt-2 flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/30">
+          <FolderIcon className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+          {watch('folderId') ? (
+            <FolderBreadcrumb
+              currentFolderId={watch('folderId')}
+              onNavigate={() => {}} // Không làm gì cả - read-only
+              className="pointer-events-none"
+            />
+          ) : (
+            <span className="text-muted-foreground">Thư mục gốc</span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          File sẽ được tải lên thư mục này. Quay lại trang trước để chọn thư mục khác.
+        </p>
+      </div>
 
       {/* File Upload */}
       <div>

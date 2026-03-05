@@ -1,145 +1,90 @@
 /**
- * Documents Service - Xử lý logic nghiệp vụ liên quan đến tài liệu
+ * DocumentsService - Xử lý logic nghiệp vụ liên quan đến tài liệu
  *
- * Các chức năng chính:
- * - CRUD tài liệu (Create, Read, Update, Delete)
- * - Tìm kiếm tài liệu
- * - Phân quyền truy cập (Admin/User)
- *
- * Phân quyền:
- * - Admin: Xem tất cả tài liệu
- * - User: Chỉ xem tài liệu của mình và tài liệu công khai
- *
- * @module DocumentsService
+ * Chức năng:
+ * - CRUD tài liệu
+ * - Phân trang
+ * - Tìm kiếm
+ * - Lấy chi tiết
+ * - Lấy breadcrumbs
+ * - Move documents between folders
+ * - Soft delete
+ * - Get document stats
  */
-
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/common/services/prisma.service';
 import { CreateDocumentDto, UpdateDocumentDto } from './dto/create-document.dto';
+
+// Types
+interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    query?: string;
+  };
+}
 
 @Injectable()
 export class DocumentsService {
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Parse keywords từ string (multipart/form-data) hoặc array
-   * Input: "toán, lớp 10" -> Output: ["toán", "lớp 10"]
-   */
-  private parseKeywords(keywords: string | string[] | undefined): string[] {
-    if (!keywords) return [];
-    if (Array.isArray(keywords)) return keywords;
-    if (typeof keywords === 'string') {
-      return keywords
-        .split(',')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-    }
-    return [];
-  }
-
-  /**
-   * Parse boolean từ string (multipart/form-data)
-   */
-  private parseBoolean(value: string | boolean | undefined): boolean {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') return value === 'true';
-    return false;
-  }
-
-  /**
-   * Tạo tài liệu mới
-   *
-   * @param userId - ID của user tạo tài liệu
-   * @param createDto - Metadata của tài liệu
-   * @param file - File được upload
-   * @returns Tài liệu đã tạo
-   */
-  async create(
-    userId: string,
-    createDto: CreateDocumentDto,
-    file: Express.Multer.File,
-  ) {
-    // Kiểm tra file
-    if (!file) {
-      throw new Error('Vui lòng chọn file để tải lên');
-    }
-
-    const keywords = this.parseKeywords(createDto.keywords);
-    const isPublic = this.parseBoolean(createDto.isPublic);
-
-    const document = await this.prisma.document.create({
-      data: {
-        userId,
-        title: createDto.title,
-        description: createDto.description,
-        author: createDto.author,
-        subject: createDto.subject,
-        // Lưu keywords dưới dạng JSON string (SQLite không hỗ trợ array)
-        keywords: JSON.stringify(keywords),
-        fileName: file.originalname,
-        filePath: file.path,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        isPublic,
-        status: 'ACTIVE',
-      },
-      include: {
-        user: {
-          select: { id: true, fullName: true, email: true },
-        },
-      },
-    });
-
-    return this.formatDocument(document);
-  }
+  // ==================== CRUD Operations ====================
 
   /**
    * Lấy danh sách tài liệu
-   *
-   * Phân quyền:
-   * - Admin: Xem tất cả tài liệu ACTIVE
-   * - User: Xem tài liệu của mình + tài liệu công khai
-   *
-   * @param userId - ID của user hiện tại
-   * @param role - Role của user (ADMIN/USER)
-   * @param page - Số trang (pagination)
-   * @param limit - Số items per page
-   * @returns Danh sách tài liệu với metadata pagination
    */
-  async findAll(userId: string, role: string, page = 1, limit = 10) {
+  async findAll(
+    userId: string,
+    role: string,
+    page: number = 1,
+    limit: number = 10,
+    folderId?: string | null,
+  ) {
     const skip = (page - 1) * limit;
 
-    // Xây dựng where clause dựa trên role
-    const where =
-      role === 'ADMIN'
-        ? { status: 'ACTIVE' }
-        : {
-            OR: [{ userId }, { isPublic: true }],
-            status: 'ACTIVE',
-          };
+    // Build where clause based on role
+    let where: any = { status: 'ACTIVE' };
 
-    // Query song song để tối ưu performance
+    if (role === 'ADMIN') {
+      // Admin sees all documents
+      if (folderId !== undefined) {
+        where.folderId = folderId ?? null;
+      }
+    } else {
+      // User sees their own documents + public ones
+      where.OR = [
+        { userId },
+        { isPublic: true },
+      ];
+      if (folderId !== undefined) {
+        where.folderId = folderId ?? null;
+      }
+    }
+
+    // Get total count and documents
     const [documents, total] = await Promise.all([
       this.prisma.document.findMany({
         where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
         include: {
           user: {
             select: { id: true, fullName: true, email: true },
           },
+          folder: {
+            select: { id: true, name: true, color: true },
+          },
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
       }),
       this.prisma.document.count({ where }),
     ]);
 
     return {
-      data: documents.map((doc) => this.formatDocument(doc)),
+      data: this.parseDocumentsResponse(documents),
       meta: {
         total,
         page,
@@ -150,19 +95,53 @@ export class DocumentsService {
   }
 
   /**
-   * Lấy chi tiết một tài liệu
-   *
-   * Kiểm tra quyền truy cập:
-   * - Admin: Xem được tất cả
-   * - Owner: Xem được tài liệu của mình
-   * - Public: Ai cũng xem được tài liệu công khai
-   *
-   * @param id - ID của tài liệu
-   * @param userId - ID của user hiện tại
-   * @param role - Role của user
-   * @returns Chi tiết tài liệu
-   * @throws NotFoundException nếu không tìm thấy
-   * @throws ForbiddenException nếu không có quyền xem
+   * Lấy tài liệu của user hiện tại
+   */
+  async getMyDocuments(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    folderId?: string | null,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      userId,
+      status: 'ACTIVE',
+    };
+
+    if (folderId !== undefined) {
+      where.folderId = folderId ?? null;
+    }
+
+    const [documents, total] = await Promise.all([
+      this.prisma.document.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          folder: {
+            select: { id: true, name: true, color: true },
+          },
+        },
+      }),
+      this.prisma.document.count({ where }),
+    ]);
+
+    return {
+      data: this.parseDocumentsResponse(documents),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Lấy chi tiết tài liệu
    */
   async findOne(id: string, userId: string, role: string) {
     const doc = await this.prisma.document.findUnique({
@@ -171,129 +150,202 @@ export class DocumentsService {
         user: {
           select: { id: true, fullName: true, email: true },
         },
+        folder: {
+          select: { id: true, name: true, color: true },
+        },
       },
     });
 
-    // Kiểm tra tài liệu tồn tại và chưa bị xóa
     if (!doc || doc.status === 'DELETED') {
-      throw new NotFoundException('Không tìm thấy tài liệu');
+      throw new NotFoundException('Document not found');
     }
 
-    // Kiểm tra quyền truy cập
-    if (role !== 'ADMIN' && doc.userId !== userId && !doc.isPublic) {
-      throw new ForbiddenException('Bạn không có quyền xem tài liệu này');
+    if (role !== 'ADMIN' && !doc.isPublic && doc.userId !== userId) {
+      throw new ForbiddenException('Access denied');
     }
 
-    return this.formatDocument(doc);
+    return this.parseDocumentResponse(doc);
   }
 
   /**
-   * Cập nhật metadata tài liệu
-   *
-   * Chỉ owner hoặc admin mới có quyền sửa
-   * Không thay đổi file, chỉ cập nhật metadata
-   *
-   * @param id - ID của tài liệu
-   * @param userId - ID của user hiện tại
-   * @param role - Role của user
-   * @param updateDto - Dữ liệu cập nhật
-   * @returns Tài liệu đã cập nhật
+   * Tạo tài liệu mới
    */
-  async update(id: string, userId: string, role: string, updateDto: UpdateDocumentDto) {
-    // Kiểm tra quyền sửa
-    const doc = await this.prisma.document.findUnique({
-      where: { id },
-      select: { userId: true, status: true },
-    });
-
-    if (!doc || doc.status === 'DELETED') {
-      throw new NotFoundException('Không tìm thấy tài liệu');
+  async create(
+    userId: string,
+    createDocumentDto: CreateDocumentDto,
+    file?: Express.Multer.File,
+  ) {
+    // Check folder access if needed
+    if (createDocumentDto.folderId) {
+      const folder = await this.prisma.folder.findUnique({
+        where: { id: createDocumentDto.folderId },
+      });
+      if (!folder || folder.status === 'DELETED') {
+        throw new NotFoundException('Folder not found');
+      }
     }
 
-    if (role !== 'ADMIN' && doc.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền sửa tài liệu này');
+    const keywords = this.parseKeywords(createDocumentDto.keywords);
+    let isPublic = false;
+    if (createDocumentDto.isPublic !== undefined) {
+      if (typeof createDocumentDto.isPublic === 'string') {
+        isPublic = createDocumentDto.isPublic === 'true';
+      } else if (typeof createDocumentDto.isPublic === 'boolean') {
+        isPublic = createDocumentDto.isPublic;
+      }
     }
 
-    // Parse keywords và isPublic
-    const keywords = updateDto.keywords !== undefined
-      ? this.parseKeywords(updateDto.keywords)
-      : undefined;
-    const isPublic = updateDto.isPublic !== undefined
-      ? this.parseBoolean(updateDto.isPublic)
-      : undefined;
-
-    // Cập nhật
-    const updated = await this.prisma.document.update({
-      where: { id },
+    const doc = await this.prisma.document.create({
       data: {
-        title: updateDto.title,
-        description: updateDto.description,
-        author: updateDto.author,
-        subject: updateDto.subject,
-        keywords: keywords !== undefined ? JSON.stringify(keywords) : undefined,
+        title: createDocumentDto.title,
+        description: createDocumentDto.description,
+        author: createDocumentDto.author,
+        subject: createDocumentDto.subject,
+        keywords: JSON.stringify(keywords),
+        folderId: createDocumentDto.folderId ?? null,
         isPublic,
+        userId,
+        status: 'ACTIVE',
+        fileName: file?.originalname,
+        filePath: file?.path,
+        fileSize: file?.size,
+        mimeType: file?.mimetype,
       },
       include: {
         user: {
           select: { id: true, fullName: true, email: true },
         },
+        folder: {
+          select: { id: true, name: true, color: true },
+        },
       },
     });
 
-    return this.formatDocument(updated);
+    return this.parseDocumentResponse(doc);
   }
 
   /**
-   * Xóa tài liệu (Soft Delete)
-   *
-   * Chỉ owner hoặc admin mới có quyền xóa
-   * Không xóa thực sự, chỉ đổi status thành DELETED
-   *
-   * @param id - ID của tài liệu
-   * @param userId - ID của user hiện tại
-   * @param role - Role của user
-   * @returns Message xác nhận
+   * Cập nhật tài liệu
    */
-  async remove(id: string, userId: string, role: string) {
-    // Kiểm tra quyền xóa
+  async update(
+    id: string,
+    userId: string,
+    role: string,
+    updateDocumentDto: UpdateDocumentDto,
+  ) {
+    // Check ownership
     const doc = await this.prisma.document.findUnique({
       where: { id },
-      select: { userId: true, status: true },
     });
 
     if (!doc || doc.status === 'DELETED') {
-      throw new NotFoundException('Không tìm thấy tài liệu');
+      throw new NotFoundException('Document not found');
     }
 
     if (role !== 'ADMIN' && doc.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xóa tài liệu này');
+      throw new ForbiddenException('Access denied');
     }
 
-    // Soft delete - chỉ đổi status
+    // Check folder access if changing folder
+    if (updateDocumentDto.folderId !== undefined) {
+      if (updateDocumentDto.folderId) {
+        const folder = await this.prisma.folder.findUnique({
+          where: { id: updateDocumentDto.folderId },
+        });
+        if (!folder || folder.status === 'DELETED') {
+          throw new NotFoundException('Folder not found');
+        }
+      }
+    }
+
+    // Build update data
+    const updateData: any = {};
+
+    if (updateDocumentDto.title !== undefined) {
+      updateData.title = updateDocumentDto.title;
+    }
+    if (updateDocumentDto.description !== undefined) {
+      updateData.description = updateDocumentDto.description;
+    }
+    if (updateDocumentDto.author !== undefined) {
+      updateData.author = updateDocumentDto.author;
+    }
+    if (updateDocumentDto.subject !== undefined) {
+      updateData.subject = updateDocumentDto.subject;
+    }
+    if (updateDocumentDto.keywords !== undefined) {
+      updateData.keywords = JSON.stringify(this.parseKeywords(updateDocumentDto.keywords));
+    }
+    if (updateDocumentDto.folderId !== undefined) {
+      updateData.folderId = updateDocumentDto.folderId ?? null;
+    }
+    if (updateDocumentDto.isPublic !== undefined) {
+      // Handle isPublic which can be string from form-data or boolean from JSON
+      const isPublicValue = updateDocumentDto.isPublic;
+      if (typeof isPublicValue === 'string') {
+        updateData.isPublic = isPublicValue === 'true';
+      } else if (typeof isPublicValue === 'boolean') {
+        updateData.isPublic = isPublicValue;
+      }
+    }
+
+    await this.prisma.document.update({
+      where: { id },
+      data: updateData,
+    });
+
+    const updatedDoc = await this.prisma.document.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: { id: true, fullName: true, email: true },
+        },
+        folder: {
+          select: { id: true, name: true, color: true },
+        },
+      },
+    });
+
+    return this.parseDocumentResponse(updatedDoc);
+  }
+
+  /**
+   * Xóa tài liệu (soft delete)
+   */
+  async remove(id: string, userId: string, role: string): Promise<void> {
+    // Check ownership
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!doc || doc.status === 'DELETED') {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (role !== 'ADMIN' && doc.userId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Soft delete
     await this.prisma.document.update({
       where: { id },
       data: { status: 'DELETED' },
     });
-
-    return { message: 'Đã xóa tài liệu thành công' };
   }
 
   /**
    * Tìm kiếm tài liệu
-   *
-   * Tìm kiếm trong các trường: title, description, author, subject
-   *
-   * @param query - Từ khóa tìm kiếm
-   * @param userId - ID của user hiện tại
-   * @param role - Role của user
-   * @param page - Số trang
-   * @param limit - Số items per page
-   * @returns Kết quả tìm kiếm
    */
-  async search(query: string, userId: string, role: string, page = 1, limit = 10) {
+  async search(
+    query: string,
+    userId: string,
+    role: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     const skip = (page - 1) * limit;
 
-    // Tìm kiếm trong nhiều trường
+    // Build where clause
     const where: any = {
       status: 'ACTIVE',
       OR: [
@@ -301,26 +353,43 @@ export class DocumentsService {
         { description: { contains: query } },
         { author: { contains: query } },
         { subject: { contains: query } },
+        { keywords: { contains: query } },
       ],
     };
 
+    if (role !== 'ADMIN') {
+      // User can only see their own + public
+      where.AND = [
+        {
+          OR: [
+            { userId },
+            { isPublic: true },
+          ],
+        },
+      ];
+    }
+
+    // Get total count
     const [documents, total] = await Promise.all([
       this.prisma.document.findMany({
         where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
         include: {
           user: {
             select: { id: true, fullName: true, email: true },
           },
+          folder: {
+            select: { id: true, name: true, color: true },
+          },
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
       }),
       this.prisma.document.count({ where }),
     ]);
 
     return {
-      data: documents.map((doc) => this.formatDocument(doc)),
+      data: this.parseDocumentsResponse(documents),
       meta: {
         total,
         page,
@@ -331,69 +400,56 @@ export class DocumentsService {
     };
   }
 
+  // ==================== Helper Methods ====================
+
   /**
-   * Lấy danh sách tài liệu của user hiện tại
-   *
-   * @param userId - ID của user
-   * @param page - Số trang
-   * @param limit - Số items per page
-   * @returns Danh sách tài liệu của user
+   * Parse keywords from string to array
    */
-  async getMyDocuments(userId: string, page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
+  private parseKeywords(keywords: string | string[] | undefined): string[] {
+    if (!keywords) return [];
 
-    const [documents, total] = await Promise.all([
-      this.prisma.document.findMany({
-        where: {
-          userId,
-          status: 'ACTIVE',
-        },
-        include: {
-          user: {
-            select: { id: true, fullName: true, email: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.document.count({
-        where: { userId, status: 'ACTIVE' },
-      }),
-    ]);
+    if (Array.isArray(keywords)) {
+      return keywords.filter((item) => item.length > 0);
+    }
 
-    return {
-      data: documents.map((doc) => this.formatDocument(doc)),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    try {
+      return keywords
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    } catch {
+      console.error('Failed to parse keywords:', keywords);
+      return [];
+    }
   }
 
   /**
-   * Format document để trả về API
-   *
-   * - Parse keywords từ JSON string thành array
-   * - Convert fileSize sang string (để tránh BigInt issues)
-   *
-   * @param doc - Document từ database
-   * @returns Document đã format
+   * Parse document keywords from JSON string to array for response
    */
-  private formatDocument(doc: any) {
-    let keywords: string[] = [];
-    try {
-      keywords = doc.keywords ? JSON.parse(doc.keywords) : [];
-    } catch {
-      keywords = [];
+  private parseDocumentResponse(doc: any): any {
+    if (!doc) return doc;
+
+    // Parse keywords if it's a string
+    if (typeof doc.keywords === 'string') {
+      try {
+        doc.keywords = JSON.parse(doc.keywords);
+      } catch {
+        doc.keywords = [];
+      }
     }
 
-    return {
-      ...doc,
-      keywords,
-      fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-    };
+    // Ensure keywords is always an array
+    if (!Array.isArray(doc.keywords)) {
+      doc.keywords = [];
+    }
+
+    return doc;
+  }
+
+  /**
+   * Parse array of documents
+   */
+  private parseDocumentsResponse(docs: any[]): any[] {
+    return docs.map((doc) => this.parseDocumentResponse(doc));
   }
 }

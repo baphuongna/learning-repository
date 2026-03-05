@@ -1,5 +1,4 @@
 // Prisma Schema cho Kho Học Liệu Số (SQLite)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -23,41 +22,71 @@ model User {
   // Quan hệ
   documents    Document[]
   news         News[]
+  folders      Folder[]
 
   @@map("users")
 }
 
-// Model Document - Tài liệu
-model Document {
+// Model Folder - Thư mục tài liệu (Google Drive style)
+model Folder {
   id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String?  @default("#3B82F6")
+  parentId    String?  @map("parent_id") // null = root folder
+  parent      Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[] @relation("FolderTree")
   userId      String   @map("user_id")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Metadata (Dublin Core simplified)
-  title       String
-  description String?
-  author      String?
-  subject     String?
-  keywords    String   // JSON string array
-  language    String   @default("vi")
-
-  // File info
-  fileName    String   @map("file_name")
-  filePath    String   @map("file_path")
-  fileSize    Int?     @map("file_size")
-  mimeType    String?  @map("mime_type")
 
   // Status
   status      String   @default("ACTIVE") // ACTIVE, ARCHIVED, DELETED
   isPublic    Boolean  @default(false) @map("is_public")
 
+  // Timestamp
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  // Indexes
+  // Quan hệ
+  documents   Document[]
+
   @@index([userId])
+  @@index([parentId])
+  @@map("folders")
+}
+
+// Model Document - Tài liệu
+model Document {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId     String?  @map("folder_id")
+  folder       Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  // Metadata
+  title        String
+  description  String?
+  author       String?
+  subject      String?
+  keywords     String?  // JSON string array
+
+  // File info
+  fileName     String?  @map("file_name")
+  filePath     String?  @map("file_path")
+  fileSize     Int?     @map("file_size")
+  mimeType     String?  @map("mime_type")
+
+  // Status
+  status       String   @default("ACTIVE") // ACTIVE, DELETED
+  isPublic     Boolean  @default(false) @map("is_public")
+
+  // Timestamps
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([folderId])
   @@index([status])
-  @@index([isPublic])
   @@map("documents")
 }
 
@@ -68,49 +97,35 @@ model NewsCategory {
   slug        String   @unique
   description String?
   order       Int      @default(0)
-  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  status      String   @default("ACTIVE")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Quan hệ
   news        News[]
 
-  @@index([status])
-  @@index([order])
   @@map("news_categories")
 }
 
 // Model News - Tin tức
 model News {
-  id           String   @id @default(uuid())
-  categoryId   String   @map("category_id")
-  category     NewsCategory @relation(fields: [categoryId], references: [id])
-  userId       String   @map("user_id")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Content
+  id           String        @id @default(uuid())
+  categoryId   String        @map("category_id")
+  category     NewsCategory  @relation(fields: [categoryId], references: [id])
+  userId       String        @map("user_id")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title        String
-  slug         String   @unique
+  slug         String        @unique
   summary      String
   content      String
-  thumbnailUrl String?  @map("thumbnail_url")
+  thumbnailUrl String?       @map("thumbnail_url")
+  isPublished  Boolean       @default(false) @map("is_published")
+  isFeatured   Boolean       @default(false) @map("is_featured")
+  publishedAt  DateTime?     @map("published_at")
+  viewCount    Int           @default(0) @map("view_count")
+  status       String        @default("DRAFT")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  // Status
-  isPublished  Boolean  @default(false) @map("is_published")
-  isFeatured   Boolean  @default(false) @map("is_featured")
-  publishedAt  DateTime? @map("published_at")
-  viewCount    Int      @default(0) @map("view_count")
-  status       String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
-
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  // Indexes
-  @@index([categoryId])
+  @@index([categoryId, isPublished, publishedAt])
   @@index([userId])
-  @@index([status])
-  @@index([isPublished])
-  @@index([isFeatured])
-  @@index([publishedAt])
   @@map("news")
 }

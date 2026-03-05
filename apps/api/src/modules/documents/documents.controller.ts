@@ -1,15 +1,14 @@
 /**
- * Documents Controller - Xử lý các HTTP requests liên quan đến tài liệu
+ * DocumentsController - Xử lý các HTTP requests liên quan đến tài liệu
  *
  * Endpoints:
  * - GET    /documents       - Danh sách tài liệu
  * - GET    /documents/my    - Tài liệu của tôi
  * - GET    /documents/:id   - Chi tiết tài liệu
+ * - GET    /documents/:id/download - Download file
  * - POST   /documents       - Tạo tài liệu mới
  * - PUT    /documents/:id   - Cập nhật tài liệu
  * - DELETE /documents/:id   - Xóa tài liệu
- *
- * @module DocumentsController
  */
 
 import {
@@ -24,7 +23,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  ParseIntPipe,
+  NotFoundException,
   Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -43,7 +42,7 @@ import { Public } from '@/common/decorators/public.decorator';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto, UpdateDocumentDto } from './dto/create-document.dto';
 import { v4 as uuidv4 } from 'uuid';
-import { extname, basename } from 'path';
+import { extname } from 'path';
 import { Response } from 'express';
 import * as fs from 'fs';
 
@@ -56,31 +55,21 @@ export class DocumentsController {
 
   /**
    * Tạo tài liệu mới với file upload
-   *
-   * Sử dụng multipart/form-data để upload file cùng với metadata
-   *
-   * @param userId - ID user từ JWT
-   * @param createDto - Metadata tài liệu
-   * @param file - File được upload
-   * @returns Tài liệu đã tạo
    */
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
-        filename: (req, file, callback) => {
+        filename: (req, file, cb) => {
           const uniqueName = uuidv4() + extname(file.originalname);
-          callback(null, uniqueName);
+          cb(null, uniqueName);
         },
       }),
-      limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB
-      },
     }),
   )
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Tạo tài liệu mới (với file)' })
+  @ApiOperation({ summary: 'Tạo tài liệu mới' })
   @ApiResponse({ status: 201, description: 'Tạo thành công' })
   async create(
     @CurrentUser('sub') userId: string,
@@ -91,58 +80,42 @@ export class DocumentsController {
   }
 
   /**
-   * Lấy danh sách tất cả tài liệu
-   *
-   * Admin xem tất cả, User chỉ xem của mình và public
-   * Hỗ trợ phân trang
-   *
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @param page - Số trang
-   * @param limit - Số items per page
-   * @returns Danh sách tài liệu với pagination
+   * Lấy danh sách tài liệu
    */
   @Get()
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Số trang' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Số items per page' })
   @ApiOperation({ summary: 'Lấy danh sách tài liệu' })
   @ApiResponse({ status: 200, description: 'Danh sách tài liệu' })
   async findAll(
     @CurrentUser('sub') userId: string,
     @CurrentUser('role') role: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('folderId') folderId?: string,
   ) {
-    return this.documentsService.findAll(userId, role, page, limit);
+    const numPage = parseInt(page || '1');
+    const numLimit = parseInt(limit || '10');
+    return this.documentsService.findAll(userId, role, numPage, numLimit, folderId);
   }
 
   /**
-   * Lấy danh sách tài liệu của user hiện tại
-   *
-   * @param userId - ID user từ JWT
-   * @param page - Số trang
-   * @param limit - Số items per page
-   * @returns Danh sách tài liệu của user
+   * Lấy tài liệu của tôi
    */
   @Get('my')
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiOperation({ summary: 'Lấy danh sách tài liệu của tôi' })
+  @ApiOperation({ summary: 'Lấy tài liệu của tôi' })
+  @ApiResponse({ status: 200, description: 'Danh sách tài liệu của tôi' })
   async getMyDocuments(
     @CurrentUser('sub') userId: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('folderId') folderId?: string,
   ) {
-    return this.documentsService.getMyDocuments(userId, page, limit);
+    const numPage = parseInt(page || '1');
+    const numLimit = parseInt(limit || '10');
+    return this.documentsService.getMyDocuments(userId, numPage, numLimit, folderId);
   }
 
   /**
    * Download file tài liệu
-   *
-   * @param id - ID tài liệu
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @param res - Response object
    */
   @Get(':id/download')
   @ApiOperation({ summary: 'Download file tài liệu' })
@@ -156,8 +129,12 @@ export class DocumentsController {
   ) {
     const doc = await this.documentsService.findOne(id, userId, role);
 
-    if (!doc.filePath || !fs.existsSync(doc.filePath)) {
-      throw new Error('File không tồn tại');
+    if (!doc || doc.status === 'DELETED') {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (!doc.filePath) {
+      throw new NotFoundException('File not found');
     }
 
     const fileBuffer = fs.readFileSync(doc.filePath);
@@ -165,18 +142,13 @@ export class DocumentsController {
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(doc.fileName)}"`,
+      `attachment; filename="${encodeURIComponent(doc.fileName || 'download')}"`,
     );
     res.send(fileBuffer);
   }
 
   /**
    * Lấy chi tiết một tài liệu
-   *
-   * @param id - ID tài liệu
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @returns Chi tiết tài liệu
    */
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết tài liệu' })
@@ -192,12 +164,6 @@ export class DocumentsController {
 
   /**
    * Cập nhật metadata tài liệu
-   *
-   * @param id - ID tài liệu
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @param updateDto - Dữ liệu cập nhật
-   * @returns Tài liệu đã cập nhật
    */
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật tài liệu' })
@@ -213,11 +179,6 @@ export class DocumentsController {
 
   /**
    * Xóa tài liệu (soft delete)
-   *
-   * @param id - ID tài liệu
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @returns Message xác nhận
    */
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa tài liệu (soft delete)' })
@@ -228,45 +189,5 @@ export class DocumentsController {
     @CurrentUser('role') role: string,
   ) {
     return this.documentsService.remove(id, userId, role);
-  }
-}
-
-/**
- * Search Controller - Xử lý tìm kiếm tài liệu
- *
- * @module SearchController
- */
-@ApiTags('Search')
-@Controller('search')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
-export class SearchController {
-  constructor(private readonly documentsService: DocumentsService) {}
-
-  /**
-   * Tìm kiếm tài liệu theo từ khóa
-   *
-   * Tìm trong: title, description, author, subject
-   *
-   * @param query - Từ khóa tìm kiếm
-   * @param userId - ID user từ JWT
-   * @param role - Role từ JWT
-   * @param page - Số trang
-   * @param limit - Số items per page
-   * @returns Kết quả tìm kiếm
-   */
-  @Get()
-  @ApiQuery({ name: 'q', required: true, description: 'Từ khóa tìm kiếm' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiOperation({ summary: 'Tìm kiếm tài liệu' })
-  async search(
-    @Query('q') query: string,
-    @CurrentUser('sub') userId: string,
-    @CurrentUser('role') role: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
-  ) {
-    return this.documentsService.search(query, userId, role, page, limit);
   }
 }

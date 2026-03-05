@@ -1,16 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { DocumentCard } from './DocumentCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Document, documentsApi } from '@/lib/api';
-import { Search, Plus, RefreshCw } from 'lucide-react';
+import { Document, documentsApi, foldersApi } from '@/lib/api';
+import { Search, Plus, RefreshCw, FileText, FolderPlus, X, Loader2 } from 'lucide-react';
+import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
+import { toast } from 'sonner';
 
-export function DocumentList() {
+interface DocumentListProps {
+  folderId?: string | null;
+  onRefresh?: number;
+  onFolderChange?: (folderId: string | null) => void;
+}
+
+export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentListProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -22,11 +29,16 @@ export function DocumentList() {
     totalPages: 0,
   });
 
+  // Folder creation state
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+
   const fetchDocuments = async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await documentsApi.getAll(page, 10);
+      const response = await documentsApi.getAll(page, 10, folderId ?? null);
       setDocuments(response.data);
       setMeta(response.meta);
     } catch (err) {
@@ -39,7 +51,7 @@ export function DocumentList() {
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [folderId, onRefresh]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +74,46 @@ export function DocumentList() {
     }
   };
 
-  if (loading && documents.length === 0) {
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) {
+      toast.error('Vui lòng nhập tên thư mục');
+      return;
+    }
+    try {
+      setIsCreatingFolder(true);
+      await foldersApi.create({
+        name: newFolderName.trim(),
+        parentId: folderId ?? null,
+      });
+      toast.success('Tạo thư mục thành công!');
+      setNewFolderName('');
+      setShowCreateFolder(false);
+      if (onFolderChange) {
+        onFolderChange(folderId ?? null);
+      }
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      toast.error('Không thể tạo thư mục');
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
+  const handleUpload = () => {
+    // Navigate to upload page with current folder context
+    const uploadUrl = folderId
+      ? `/documents/upload?folderId=${folderId}`
+      : '/documents/upload';
+    router.push(uploadUrl);
+  };
+
+  const handleNavigate = (targetFolderId: string | null) => {
+    if (onFolderChange) {
+      onFolderChange(targetFolderId);
+    }
+  };
+
+  if (loading && documents.length === 0 && !showCreateFolder) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -73,6 +124,12 @@ export function DocumentList() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <FolderBreadcrumb
+        currentFolderId={folderId ?? null}
+        onNavigate={handleNavigate}
+        className="mb-4"
+      />
       {/* Search & Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4">
         <form onSubmit={handleSearch} className="relative flex-1">
@@ -85,35 +142,103 @@ export function DocumentList() {
             className="pl-10"
           />
         </form>
-        <Button onClick={() => router.push('/documents/upload')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Tải lên
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowCreateFolder(!showCreateFolder)}
+          >
+            <FolderPlus className="h-4 w-4 mr-2" />
+            Tạo thư mục
+          </Button>
+          <Button onClick={handleUpload}>
+            <Plus className="h-4 w-4 mr-2" />
+            Tải lên
+          </Button>
+        </div>
       </div>
-
+      {/* Create Folder Dialog */}
+      {showCreateFolder && (
+        <div className="bg-muted/50 border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium">Tạo thư mục mới</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowCreateFolder(false);
+                setNewFolderName('');
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Nhập tên thư mục..."
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleCreateFolder();
+                }
+              }}
+              className="flex-1"
+              autoFocus
+            />
+            <Button
+              onClick={handleCreateFolder}
+              disabled={isCreatingFolder || !newFolderName.trim()}
+            >
+              {isCreatingFolder ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Tạo
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {folderId
+              ? 'Thư mục sẽ được tạo trong thư mục hiện tại'
+              : 'Thư mục sẽ được tạo ở thư mục gốc'}
+          </p>
+        </div>
+      )}
       {/* Error Message */}
       {error && (
         <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
           {error}
         </div>
       )}
-
       {/* Document Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {documents.map((doc) => (
           <DocumentCard key={doc.id} document={doc} />
         ))}
       </div>
-
       {/* Empty State */}
       {documents.length === 0 && !loading && (
         <div className="text-center py-20 text-muted-foreground">
           <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">Không tìm thấy tài liệu nào</p>
           <p className="text-sm">Hãy thử tìm kiếm với từ khóa khác hoặc tải lên tài liệu mới</p>
+          {!showCreateFolder && (
+            <div className="flex gap-2 justify-center mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateFolder(true)}
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Tạo thư mục mới
+              </Button>
+              <Button onClick={handleUpload}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tải lên tài liệu
+              </Button>
+            </div>
+          )}
         </div>
       )}
-
       {/* Pagination */}
       {meta.totalPages > 1 && (
         <div className="flex justify-center gap-2">

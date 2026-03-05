@@ -93,19 +93,49 @@ export interface Document {
   author: string | null;
   subject: string | null;
   keywords: string[];
-  language: string;
   fileName: string;
   filePath: string | null;
-  fileSize: string | null;
+  fileSize: number | null;
   mimeType: string | null;
   status: string;
   isPublic: boolean;
+  folderId: string | null;
+  folder?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   user: {
     id: string;
     fullName: string;
     email: string;
+  };
+}
+
+/**
+ * Folder type - Thư mục tài liệu (Google Drive style)
+ */
+export interface Folder {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  parentId: string | null;
+  userId: string;
+  isPublic: boolean;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    fullName: string;
+  };
+  children?: Folder[];
+  _count?: {
+    documents: number;
+    children: number;
   };
 }
 
@@ -196,10 +226,15 @@ export const documentsApi = {
    *
    * @param page - Số trang
    * @param limit - Số items per page
+   * @param folderId - Lọc theo thư mục (optional)
    * @returns Paginated list of documents
    */
-  getAll: async (page = 1, limit = 10): Promise<PaginatedResponse<Document>> => {
-    const response = await api.get('/documents', { params: { page, limit } });
+  getAll: async (page = 1, limit = 10, folderId?: string | null): Promise<PaginatedResponse<Document>> => {
+    const params: Record<string, any> = { page, limit };
+    if (folderId) {
+      params.folderId = folderId;
+    }
+    const response = await api.get('/documents', { params });
     return response.data;
   },
 
@@ -450,5 +485,82 @@ export const newsApi = {
    */
   delete: async (id: string): Promise<void> => {
     await api.delete(`/news/${id}`);
+  },
+};
+
+// ==================== Folders API ====================
+
+/**
+ * Folders API - Các hàm gọi API thư mục
+ */
+export const foldersApi = {
+  /**
+   * Lấy danh sách thư mục (flat list)
+   */
+  getAll: async (): Promise<Folder[]> => {
+    const response = await api.get('/folders');
+    return response.data;
+  },
+
+  /**
+   * Lấy cây thư mục (nested structure)
+   */
+  getTree: async (parentId?: string | null): Promise<Folder[]> => {
+    const params = parentId ? { parentId } : {};
+    const response = await api.get('/folders/tree', { params });
+    return response.data;
+  },
+
+  /**
+   * Lấy chi tiết thư mục
+   */
+  getById: async (id: string): Promise<Folder> => {
+    const response = await api.get(`/folders/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Lấy breadcrumb của thư mục
+   */
+  getBreadcrumbs: async (id: string): Promise<Folder[]> => {
+    const response = await api.get(`/folders/${id}/breadcrumbs`);
+    return response.data;
+  },
+
+  /**
+   * Lấy thư mục con
+   */
+  getChildren: async (id: string): Promise<Folder[]> => {
+    const response = await api.get(`/folders/${id}/children`);
+    return response.data;
+  },
+
+  /**
+   * Tạo thư mục mới
+   */
+  create: async (data: {
+    name: string;
+    description?: string;
+    color?: string;
+    parentId?: string | null;
+    isPublic?: boolean;
+  }): Promise<Folder> => {
+    const response = await api.post('/folders', data);
+    return response.data;
+  },
+
+  /**
+   * Cập nhật thư mục
+   */
+  update: async (id: string, data: Partial<Folder>): Promise<Folder> => {
+    const response = await api.put(`/folders/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Xóa thư mục
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/folders/${id}`);
   },
 };

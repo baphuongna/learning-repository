@@ -12,12 +12,11 @@ interface DocumentCardProps {
 
 export function DocumentCard({ document }: DocumentCardProps) {
   // Format file size
-  const formatFileSize = (bytes: string | null) => {
+  const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'N/A';
-    const size = Number(bytes);
-    if (size < 1024) return size + ' B';
-    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
-    return (size / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   // Get file icon based on extension
@@ -73,12 +72,12 @@ export function DocumentCard({ document }: DocumentCardProps) {
         </p>
 
         <div className="flex flex-wrap gap-1">
-          {document.keywords.slice(0, 3).map((keyword, index) => (
+          {Array.isArray(document.keywords) && document.keywords.slice(0, 3).map((keyword, index) => (
             <Badge key={index} variant="secondary" className="text-xs">
               {keyword}
             </Badge>
           ))}
-          {document.keywords.length > 3 && (
+          {Array.isArray(document.keywords) && document.keywords.length > 3 && (
             <Badge variant="outline" className="text-xs">
               +{document.keywords.length - 3}
             </Badge>
@@ -91,7 +90,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <User className="h-4 w-4" />
-              {document.user.fullName}
+              {document.user?.fullName || 'N/A'}
             </span>
             <span className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />

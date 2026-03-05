@@ -38,8 +38,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Người dùng không tồn tại');
     }
 
-    // Return object với 'sub' field để tương thích với @CurrentUser('sub')
+    // Return object với cả 'id' và 'sub' để tương thích với các controller
     return {
+      id: user.id,
       sub: user.id,
       email: user.email,
       fullName: user.fullName,
