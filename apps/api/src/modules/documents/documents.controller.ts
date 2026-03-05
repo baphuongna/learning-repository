@@ -94,7 +94,9 @@ export class DocumentsController {
   ) {
     const numPage = parseInt(page || '1');
     const numLimit = parseInt(limit || '10');
-    return this.documentsService.findAll(userId, role, numPage, numLimit, folderId);
+    // Convert 'null' string to null, undefined means no filter
+    const parsedFolderId = folderId === 'null' ? null : folderId;
+    return this.documentsService.findAll(userId, role, numPage, numLimit, parsedFolderId);
   }
 
   /**
@@ -111,7 +113,9 @@ export class DocumentsController {
   ) {
     const numPage = parseInt(page || '1');
     const numLimit = parseInt(limit || '10');
-    return this.documentsService.getMyDocuments(userId, numPage, numLimit, folderId);
+    // Convert 'null' string to null, undefined means no filter
+    const parsedFolderId = folderId === 'null' ? null : folderId;
+    return this.documentsService.getMyDocuments(userId, numPage, numLimit, parsedFolderId);
   }
 
   /**

@@ -231,8 +231,9 @@ export const documentsApi = {
    */
   getAll: async (page = 1, limit = 10, folderId?: string | null): Promise<PaginatedResponse<Document>> => {
     const params: Record<string, any> = { page, limit };
-    if (folderId) {
-      params.folderId = folderId;
+    // Gửi 'null' để filter theo thư mục gốc, undefined thì không filter
+    if (folderId !== undefined) {
+      params.folderId = folderId || 'null';
     }
     const response = await api.get('/documents', { params });
     return response.data;

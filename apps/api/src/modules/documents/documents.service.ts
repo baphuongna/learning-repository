@@ -48,20 +48,18 @@ export class DocumentsService {
     // Build where clause based on role
     let where: any = { status: 'ACTIVE' };
 
-    if (role === 'ADMIN') {
-      // Admin sees all documents
-      if (folderId !== undefined) {
-        where.folderId = folderId ?? null;
-      }
-    } else {
+    // Filter by folder if folderId is provided (including null for root folder)
+    // undefined means no filter at all
+    if (folderId !== undefined) {
+      where.folderId = folderId;
+    }
+
+    if (role !== 'ADMIN') {
       // User sees their own documents + public ones
       where.OR = [
         { userId },
         { isPublic: true },
       ];
-      if (folderId !== undefined) {
-        where.folderId = folderId ?? null;
-      }
     }
 
     // Get total count and documents
@@ -110,8 +108,9 @@ export class DocumentsService {
       status: 'ACTIVE',
     };
 
+    // Filter by folderId if provided (including null for root folder)
     if (folderId !== undefined) {
-      where.folderId = folderId ?? null;
+      where.folderId = folderId;
     }
 
     const [documents, total] = await Promise.all([

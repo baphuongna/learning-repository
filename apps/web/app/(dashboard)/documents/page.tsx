@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useCallback } from 'react';
 import { DocumentList } from '@/components/documents/DocumentList';
-import { FolderTree } from '@/components/folders/FolderTree';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toaster } from 'sonner';
@@ -19,21 +18,15 @@ function DocumentListFallback() {
 export default function DocumentsPage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [folderTreeKey, setFolderTreeKey] = useState(0);
-
-  const handleSelectFolder = useCallback((folderId: string | null) => {
-    setCurrentFolderId(folderId);
-  }, []);
 
   const handleFolderChange = useCallback((folderId: string | null) => {
-    // Refresh folder tree khi có thay đổi (tạo/xóa/sửa folder)
-    setFolderTreeKey((prev) => prev + 1);
+    // Cập nhật folder hiện tại khi double-click vào folder
+    setCurrentFolderId(folderId);
     setRefreshKey((prev) => prev + 1);
   }, []);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
-    setFolderTreeKey((prev) => prev + 1);
   }, []);
 
   return (
@@ -53,41 +46,16 @@ export default function DocumentsPage() {
         </Button>
       </div>
 
-      {/* Main content area */}
-      <div className="flex gap-6">
-        {/* Folder tree sidebar */}
-        <div className="w-64 flex-shrink-0 border rounded-lg p-4 bg-card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Thư mục</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSelectFolder(null)}
-              className="text-xs"
-            >
-              Xem tất cả
-            </Button>
-          </div>
-          <Suspense fallback={<div className="p-4 text-center text-muted-foreground">Đang tải...</div>}>
-            <FolderTree
-              key={folderTreeKey}
-              currentFolderId={currentFolderId}
-              onSelectFolder={handleSelectFolder}
-            />
-          </Suspense>
-        </div>
-
-        {/* Document list */}
-        <div className="flex-1 min-w-0">
-          <Suspense fallback={<DocumentListFallback />}>
-            <DocumentList
-              key={refreshKey}
-              folderId={currentFolderId}
-              onRefresh={refreshKey}
-              onFolderChange={handleFolderChange}
-            />
-          </Suspense>
-        </div>
+      {/* Document list */}
+      <div className="flex-1 min-w-0">
+        <Suspense fallback={<DocumentListFallback />}>
+          <DocumentList
+            key={refreshKey}
+            folderId={currentFolderId}
+            onRefresh={refreshKey}
+            onFolderChange={handleFolderChange}
+          />
+        </Suspense>
       </div>
     </div>
   );

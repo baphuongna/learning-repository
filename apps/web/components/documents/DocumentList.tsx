@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentCard } from './DocumentCard';
+import { ViewToggle, ViewMode } from './ViewToggle';
+import { FolderItem } from './FolderItem';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Document, documentsApi, foldersApi } from '@/lib/api';
+import { Document, Folder, documentsApi, foldersApi } from '@/lib/api';
 import { Search, Plus, RefreshCw, FileText, FolderPlus, X, Loader2 } from 'lucide-react';
 import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
 import { toast } from 'sonner';
@@ -19,6 +21,7 @@ interface DocumentListProps {
 export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentListProps) {
   const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,21 +31,39 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
     limit: 10,
     totalPages: 0,
   });
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   // Folder creation state
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  const fetchDocuments = async (page = 1) => {
+  const fetchData = async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await documentsApi.getAll(page, 10, folderId ?? null);
-      setDocuments(response.data);
-      setMeta(response.meta);
+
+      // Fetch folders in current folder and documents in parallel
+      let foldersData: Folder[] = [];
+
+      // Get child folders of current folder
+      if (folderId) {
+        // If folderId is provided, get children of that folder
+        foldersData = await foldersApi.getChildren(folderId);
+      } else {
+        // Root folder - get all folders without parentId
+        const allFolders = await foldersApi.getAll();
+        foldersData = allFolders.filter(f => !f.parentId);
+      }
+
+      // Get documents in current folder (null for root, folderId for subfolders)
+      const documentsResponse = await documentsApi.getAll(page, 10, folderId ?? null);
+
+      setFolders(foldersData);
+      setDocuments(documentsResponse.data);
+      setMeta(documentsResponse.meta);
     } catch (err) {
-      console.error('Failed to fetch documents:', err);
+      console.error('Failed to fetch data:', err);
       setError('Không thể tải danh sách tài liệu');
     } finally {
       setLoading(false);
@@ -50,21 +71,23 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
   };
 
   useEffect(() => {
-    fetchDocuments();
+    fetchData();
   }, [folderId, onRefresh]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) {
-      fetchDocuments();
+      fetchData();
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
+      // Search only searches documents, not folders
       const response = await documentsApi.search(searchQuery.trim());
       setDocuments(response.data);
+      setFolders([]); // Hide folders during search
       setMeta(response.meta);
     } catch (err) {
       console.error('Search failed:', err);
@@ -88,9 +111,7 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
       toast.success('Tạo thư mục thành công!');
       setNewFolderName('');
       setShowCreateFolder(false);
-      if (onFolderChange) {
-        onFolderChange(folderId ?? null);
-      }
+      fetchData(); // Refresh data
     } catch (error) {
       console.error('Failed to create folder:', error);
       toast.error('Không thể tạo thư mục');
@@ -113,7 +134,15 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
     }
   };
 
-  if (loading && documents.length === 0 && !showCreateFolder) {
+  const handleOpenFolder = (targetFolderId: string) => {
+    handleNavigate(targetFolderId);
+  };
+
+  const handleRefreshData = () => {
+    fetchData();
+  };
+
+  if (loading && documents.length === 0 && folders.length === 0 && !showCreateFolder) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -121,6 +150,8 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
       </div>
     );
   }
+
+  const hasItems = folders.length > 0 || documents.length > 0;
 
   return (
     <div className="space-y-6">
@@ -130,6 +161,7 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
         onNavigate={handleNavigate}
         className="mb-4"
       />
+
       {/* Search & Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4">
         <form onSubmit={handleSearch} className="relative flex-1">
@@ -142,7 +174,8 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
             className="pl-10"
           />
         </form>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
           <Button
             variant="outline"
             onClick={() => setShowCreateFolder(!showCreateFolder)}
@@ -156,6 +189,7 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
           </Button>
         </div>
       </div>
+
       {/* Create Folder Dialog */}
       {showCreateFolder && (
         <div className="bg-muted/50 border rounded-lg p-4">
@@ -204,20 +238,89 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
           </p>
         </div>
       )}
+
       {/* Error Message */}
       {error && (
         <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
           {error}
         </div>
       )}
-      {/* Document Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {documents.map((doc) => (
-          <DocumentCard key={doc.id} document={doc} />
-        ))}
-      </div>
+
+      {/* Grid View */}
+      {viewMode === 'grid' && (
+        <>
+          {/* Folders Grid */}
+          {folders.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {folders.map((folder) => (
+                <FolderItem
+                  key={folder.id}
+                  folder={folder}
+                  viewMode={viewMode}
+                  onOpen={handleOpenFolder}
+                  onRefresh={handleRefreshData}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Documents Grid */}
+          {documents.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {documents.map((doc) => (
+                <DocumentCard key={doc.id} document={doc} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="border rounded-lg overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-4 px-4 py-2 bg-muted/50 border-b text-sm font-medium text-muted-foreground">
+            <span className="w-5" /> {/* Icon space */}
+            <span className="flex-1">Tên</span>
+            <span className="w-24 text-center">Số tài liệu</span>
+            <span className="w-32">Ngày cập nhật</span>
+            <span className="w-8" /> {/* Actions space */}
+          </div>
+
+          {/* Folders List */}
+          {folders.map((folder) => (
+            <FolderItem
+              key={folder.id}
+              folder={folder}
+              viewMode={viewMode}
+              onOpen={handleOpenFolder}
+              onRefresh={handleRefreshData}
+            />
+          ))}
+
+          {/* Documents List */}
+          {documents.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors border-b"
+              onClick={() => router.push(`/documents/${doc.id}`)}
+            >
+              <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <span className="font-medium flex-1 truncate">{doc.title}</span>
+              <span className="w-24 text-center text-sm text-muted-foreground">
+                {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : '-'}
+              </span>
+              <span className="w-32 text-xs text-muted-foreground">
+                {new Date(doc.updatedAt).toLocaleDateString('vi-VN')}
+              </span>
+              <span className="w-8" /> {/* Actions space */}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Empty State */}
-      {documents.length === 0 && !loading && (
+      {!hasItems && !loading && (
         <div className="text-center py-20 text-muted-foreground">
           <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">Không tìm thấy tài liệu nào</p>
@@ -239,12 +342,13 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
           )}
         </div>
       )}
+
       {/* Pagination */}
       {meta.totalPages > 1 && (
         <div className="flex justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => fetchDocuments(meta.page - 1)}
+            onClick={() => fetchData(meta.page - 1)}
             disabled={meta.page === 1 || loading}
           >
             Trước
@@ -254,7 +358,7 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
           </span>
           <Button
             variant="outline"
-            onClick={() => fetchDocuments(meta.page + 1)}
+            onClick={() => fetchData(meta.page + 1)}
             disabled={meta.page === meta.totalPages || loading}
           >
             Sau

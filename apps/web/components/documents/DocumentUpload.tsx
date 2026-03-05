@@ -116,7 +116,7 @@ export function DocumentUpload() {
           <FolderIcon className="h-4 w-4 text-yellow-500 flex-shrink-0" />
           {watch('folderId') ? (
             <FolderBreadcrumb
-              currentFolderId={watch('folderId')}
+              currentFolderId={watch('folderId') ?? null}
               onNavigate={() => {}} // Không làm gì cả - read-only
               className="pointer-events-none"
             />
