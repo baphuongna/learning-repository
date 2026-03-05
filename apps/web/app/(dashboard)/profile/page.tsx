@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/providers';
 import { authApi, User } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Save, User as UserIcon, Mail, Calendar, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardBadge } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, User as UserIcon, Mail, Calendar, FileText, Camera } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -23,9 +24,8 @@ export default function ProfilePage() {
     avatarUrl: '',
   });
 
-  const [profile, setProfile] = useState<User & { _count?: { documents: number } } | null>(null);
-
-  useEffect(() => {
+  // Fetch profile on mount
+  useState(() => {
     fetchProfile();
   }, []);
 
@@ -90,60 +90,97 @@ export default function ProfilePage() {
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="relative">
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          <Loader2 className="relative h-8 w-8 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Thông tin cá nhân</h1>
+        <h1 className="font-display text-2xl font-bold text-foreground">Thông tin cá nhân</h1>
         <p className="text-muted-foreground">Quản lý thông tin tài khoản của bạn</p>
       </div>
 
       {/* Profile Info Card */}
-      <Card>
+      <Card variant="gradient" className="overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-blur-xl" />
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserIcon className="h-5 w-5" />
-            Thông tin tài khoản
-          </CardTitle>
+          <div className="flex items-center gap-4">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.fullName}
+                className="h-16 w-16 rounded-full object-cover ring-2 ring-primary/20"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-teal-600 flex items-center justify-center shadow-lg">
+                <UserIcon className="h-8 w-8 text-white" />
+              </div>
+            )}
+            <div>
+              <CardTitle className="text-xl">{user?.fullName}</CardTitle>
+              <CardDescription className="flex items-center gap-2">
+                <Mail className="h-3.5 w-3.5" />
+                {user?.email}
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{profile?.email}</span>
+        <CardContent className="grid grid-cols-3 gap-4 pt-4">
+          <div className="text-center p-3 rounded-lg bg-background/50">
+            <Calendar className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-xs text-muted-foreground">Tham gia</p>
+            <p className="text-sm font-medium">{user?.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">Tham gia từ {profile?.createdAt ? formatDate(profile.createdAt) : 'N/A'}</span>
+          <div className="text-center p-3 rounded-lg bg-background/50">
+            <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-xs text-muted-foreground">Tài liệu</p>
+            <p className="text-sm font-medium">{user?._count?.documents || 0}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{profile?._count?.documents || 0} tài liệu đã đăng</span>
+          <div className="text-center p-3 rounded-lg bg-background/50">
+            <UserIcon className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-xs text-muted-foreground">Vai trò</p>
+            <p className="text-sm font-medium">
+              {user?.role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên'}
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Edit Form */}
+      {/* Edit Form Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Chỉnh sửa thông tin</CardTitle>
-          <CardDescription>Cập nhật họ tên và ảnh đại diện</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5 text-primary" />
+            Chỉnh sửa thông tin
+          </CardTitle>
+          <CardDescription>
+            Cập nhật họ tên và ảnh đại diện
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Error */}
             {error && (
-              <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
                 {error}
               </div>
             )}
 
             {/* Success */}
             {success && (
-              <div className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-4 py-3 rounded-md text-sm">
+              <div className="bg-green-100/50 border border-green-200 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 2 0 4.7 1.3.1 7.5 3.5v3.5m0 4.5m0 4.5v3.5m0 4.5m0 4.5v-3.5m0-4.5v3.5m-4.5v-3.5m0-4.5v3.5m0 4.5v3.5m0 4.5v-3.5m0-4.5v3.5m0 4.5v3.5m0 4.5v-3.5m0-4.5v3.5m0 4.5v3.5m0 4.5v-3.5m0-4.5v3.5m0 4.5v3.5m0 4.5v-3.5m0-4.5v3.5m0 4.5v3.5m0 4.5z" />
+                </svg>
                 {success}
               </div>
             )}
@@ -154,7 +191,7 @@ export default function ProfilePage() {
                 <img
                   src={formData.avatarUrl}
                   alt="Avatar preview"
-                  className="h-20 w-20 rounded-full object-cover border"
+                  className="h-20 w-20 rounded-full object-cover border-2 border-primary/20"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
@@ -185,17 +222,17 @@ export default function ProfilePage() {
                 type="url"
               />
               <p className="text-xs text-muted-foreground">
-                Nhập URL hình ảnh hoặc để trống
+                Nhập URL hình ảnh hoặc để trống để sử dụng avatar mặc định
               </p>
             </div>
 
             {/* Buttons */}
             <div className="flex gap-3 pt-4">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" variant="gradient" className="flex-1" disabled={loading}>
                 {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Camera className="h-4 w-4" />
                 )}
                 {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
               </Button>

@@ -2,50 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   EduModern Design System - Kho Học Liệu Số
+   Typography: DM Serif Display + Source Sans 3
+   Colors: Emerald/Teal primary + Amber accent
+   ============================================ */
+
 @layer base {
+  /* Light Mode - Warm & Inviting */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Background & Foreground */
+    --background: 40 20% 98%;           /* Warm off-white #faf9f7 */
+    --foreground: 20 10% 15%;           /* Rich dark #1a1a1a */
+
+    /* Card */
+    --card: 0 0% 100%;                  /* Pure white */
+    --card-foreground: 20 10% 15%;
+
+    /* Popover */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 20 10% 15%;
+
+    /* Primary - Deep Emerald */
+    --primary: 160 60% 45%;             /* #2d9d78 */
+    --primary-foreground: 0 0% 100%;    /* White */
+
+    /* Secondary - Warm Gray */
+    --secondary: 40 15% 94%;            /* Light warm gray */
+    --secondary-foreground: 20 10% 25%;
+
+    /* Muted */
+    --muted: 40 20% 95%;                /* Light warm gray */
+    --muted-foreground: 20 10% 45%;     /* Medium gray */
+
+    /* Accent - Warm Amber */
+    --accent: 40 85% 60%;               /* #f59e0b */
+    --accent-foreground: 20 10% 15%;
+
+    /* Destructive */
+    --destructive: 0 72% 51%;           /* Red */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border & Input */
+    --border: 40 20% 90%;               /* Warm light border */
+    --input: 40 20% 90%;
+    --ring: 160 60% 45%;                /* Emerald ring */
+
+    /* Radius */
+    --radius: 0.625rem;                 /* Slightly rounded */
+
+    /* Custom Properties */
+    --gradient-primary: linear-gradient(135deg, hsl(160 60% 45%), hsl(180 55% 40%));
+    --gradient-accent: linear-gradient(135deg, hsl(40 85% 60%), hsl(30 80% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(160 60% 45% / 0.1), hsl(40 85% 60% / 0.1));
   }
 
+  /* Dark Mode - Rich & Sophisticated */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Background & Foreground */
+    --background: 20 15% 12%;           /* Rich navy #1a1d23 */
+    --foreground: 40 20% 95%;           /* Warm white */
+
+    /* Card */
+    --card: 20 15% 15%;                 /* Slightly lighter navy */
+    --card-foreground: 40 20% 95%;
+
+    /* Popover */
+    --popover: 20 15% 15%;
+    --popover-foreground: 40 20% 95%;
+
+    /* Primary - Brighter Teal */
+    --primary: 160 55% 50%;             /* #3db38a */
+    --primary-foreground: 20 15% 12%;
+
+    /* Secondary */
+    --secondary: 20 15% 20%;
+    --secondary-foreground: 40 20% 90%;
+
+    /* Muted */
+    --muted: 20 15% 18%;
+    --muted-foreground: 40 20% 65%;
+
+    /* Accent - Brighter Amber */
+    --accent: 40 80% 55%;               /* Brighter amber */
+    --accent-foreground: 20 15% 12%;
+
+    /* Destructive */
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border & Input */
+    --border: 20 15% 25%;
+    --input: 20 15% 25%;
+    --ring: 160 55% 50%;
+
+    /* Custom Properties */
+    --gradient-primary: linear-gradient(135deg, hsl(160 55% 50%), hsl(180 50% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(40 80% 55%), hsl(30 75% 50%));
+    --gradient-hero: linear-gradient(135deg, hsl(160 55% 50% / 0.15), hsl(40 80% 55% / 0.15));
   }
 }
 
@@ -53,7 +107,100 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Typography refinements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Gradient Text */
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-accent {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Focus ring animation */
+  .focus-ring {
+    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
+    transition: ring-color 0.2s ease;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-card/80 backdrop-blur-md;
+  }
+
+  /* Shimmer animation for skeleton */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+@layer utilities {
+  /* Animation delays */
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
+  .animation-delay-500 { animation-delay: 500ms; }
+
+  /* Text balance */
+  .text-balance {
+    text-wrap: balance;
   }
 }

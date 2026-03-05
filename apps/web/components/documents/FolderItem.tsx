@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Folder, foldersApi } from '@/lib/api';
-import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,9 +18,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { ViewMode } from './ViewToggle';
+import { cn } from '@/lib/utils';
+
+/**
+ * FolderItem Component - EduModern Design System
+ *
+ * Features:
+ * - Google Drive style folder design
+ * - Warm amber/yellow folder color
+ * - Smooth hover effects
+ * - Context menu actions
+ */
 
 interface FolderItemProps {
   folder: Folder;
@@ -105,9 +117,15 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
     <>
       {/* Create subfolder dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Tạo thư mục con</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderPlus className="h-5 w-5 text-primary" />
+              Tạo thư mục con
+            </DialogTitle>
+            <DialogDescription>
+              Tạo thư mục mới bên trong "{folder.name}"
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -136,9 +154,12 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
 
       {/* Edit folder dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Đổi tên thư mục</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Đổi tên thư mục
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -167,17 +188,26 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
 
       {/* Delete confirmation dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Xóa thư mục</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Xóa thư mục
+            </DialogTitle>
+            <DialogDescription>
+              Hành động này không thể hoàn tác.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p>
-              Bạn có chắc muốn xóa thư mục <strong>"{folder.name}"</strong>?
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Tất cả tài liệu trong thư mục này cũng sẽ bị xóa.
-            </p>
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <p className="font-medium">
+                Bạn có chắc muốn xóa thư mục <strong className="text-destructive">"{folder.name}"</strong>?
+              </p>
+              <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                <FileText className="h-4 w-4" />
+                Tất cả tài liệu trong thư mục này cũng sẽ bị xóa.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
@@ -185,7 +215,7 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
             </Button>
             <Button variant="destructive" onClick={handleDeleteFolder} disabled={isLoading}>
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Xóa
+              Xóa thư mục
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -197,23 +227,26 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
   const renderDropdownMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+        <button
+          className={cn(
+            'h-7 w-7 rounded-lg flex items-center justify-center transition-all',
+            'opacity-0 group-hover:opacity-100',
+            'text-muted-foreground hover:text-foreground hover:bg-muted'
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           <MoreHorizontal className="h-4 w-4" />
-        </Button>
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             setShowCreateDialog(true);
           }}
+          className="gap-2"
         >
-          <FolderPlus className="h-4 w-4 mr-2" />
+          <FolderPlus className="h-4 w-4" />
           Tạo thư mục con
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -222,8 +255,9 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
             setEditFolderName(folder.name);
             setShowEditDialog(true);
           }}
+          className="gap-2"
         >
-          <Pencil className="h-4 w-4 mr-2" />
+          <Pencil className="h-4 w-4" />
           Đổi tên
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -232,34 +266,52 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
             e.stopPropagation();
             setShowDeleteDialog(true);
           }}
-          className="text-destructive focus:text-destructive"
+          className="text-destructive focus:text-destructive gap-2"
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="h-4 w-4" />
           Xóa
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 
-  // Grid view - Compact style như Google Drive
+  // Grid view - Google Drive style
   if (viewMode === 'grid') {
     return (
       <>
         <div
-          className="group relative rounded-lg p-3 hover:bg-accent/50 cursor-pointer transition-colors"
+          className="group relative rounded-xl p-4 hover:bg-gradient-to-br hover:from-accent/10 hover:to-primary/5 cursor-pointer transition-all duration-200 border border-transparent hover:border-border/50"
           onDoubleClick={handleDoubleClick}
         >
           <div className="flex flex-col items-center text-center">
-            <div className="relative mb-2">
-              <FolderIcon className="h-12 w-12 text-yellow-500" strokeWidth={1.5} />
+            {/* Folder Icon */}
+            <div className="relative mb-3">
+              <div className="relative">
+                {/* Folder shadow */}
+                <div className="absolute inset-0 bg-amber-400/20 blur-lg rounded-full transform scale-90" />
+                {/* Folder icon */}
+                <FolderIcon
+                  className="h-16 w-16 text-amber-500 drop-shadow-md relative z-10"
+                  strokeWidth={1.5}
+                  fill="currentColor"
+                  fillOpacity={0.15}
+                />
+              </div>
               {/* Dropdown menu button */}
-              <div className="absolute -top-1 -right-1">
+              <div className="absolute -top-1 -right-1 z-20">
                 {renderDropdownMenu()}
               </div>
             </div>
-            <span className="font-medium text-sm truncate w-full px-1">{folder.name}</span>
+
+            {/* Folder name */}
+            <span className="font-medium text-sm truncate w-full px-1 text-foreground">
+              {folder.name}
+            </span>
+
+            {/* Document count */}
             {folder._count && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <FileText className="h-3 w-3" />
                 {folder._count.documents} tài liệu
               </span>
             )}
@@ -274,19 +326,38 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
   return (
     <>
       <div
-        className="group flex items-center gap-4 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors border-b"
+        className="group flex items-center gap-4 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/50"
         onDoubleClick={handleDoubleClick}
       >
-        <FolderIcon className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-        <span className="font-medium flex-1 truncate">{folder.name}</span>
+        {/* Folder Icon */}
+        <div className="relative flex-shrink-0">
+          <FolderIcon
+            className="h-5 w-5 text-amber-500"
+            strokeWidth={1.5}
+            fill="currentColor"
+            fillOpacity={0.15}
+          />
+        </div>
+
+        {/* Folder name */}
+        <span className="font-medium flex-1 truncate text-foreground">
+          {folder.name}
+        </span>
+
+        {/* Document count */}
         {folder._count && (
-          <span className="text-sm text-muted-foreground">
-            {folder._count.documents} tài liệu
+          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            {folder._count.documents}
           </span>
         )}
-        <span className="text-xs text-muted-foreground">
+
+        {/* Updated date */}
+        <span className="text-xs text-muted-foreground w-28 text-right">
           {new Date(folder.updatedAt).toLocaleDateString('vi-VN')}
         </span>
+
+        {/* Actions */}
         {renderDropdownMenu()}
       </div>
       {renderDialogs()}

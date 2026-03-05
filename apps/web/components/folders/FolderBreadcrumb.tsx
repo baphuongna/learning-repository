@@ -2,9 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { Folder as FolderType, foldersApi } from '@/lib/api';
-import { ChevronRight, Home, Loader2, Folder as FolderIcon } from 'lucide-react';
+import { ChevronRight, Home, Loader2, Folder as FolderIcon, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+
+/**
+ * FolderBreadcrumb Component - EduModern Design System
+ *
+ * Features:
+ * - Clean breadcrumb navigation
+ * - Home icon for root
+ * - Clickable path items
+ * - Current item highlighted
+ */
 
 interface FolderBreadcrumbProps {
   currentFolderId: string | null;
@@ -25,7 +34,6 @@ export function FolderBreadcrumb({ currentFolderId, onNavigate, className }: Fol
 
       try {
         setLoading(true);
-        // Gọi API để lấy breadcrumb path
         const response = await foldersApi.getBreadcrumbs(currentFolderId);
         setBreadcrumbs(response);
       } catch (error) {
@@ -42,45 +50,60 @@ export function FolderBreadcrumb({ currentFolderId, onNavigate, className }: Fol
   if (loading) {
     return (
       <div className={cn('flex items-center gap-2 text-sm', className)}>
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
         <span className="text-muted-foreground">Đang tải...</span>
       </div>
     );
   }
 
   return (
-    <div className={cn('flex items-center gap-1 text-sm flex-wrap', className)}>
+    <nav className={cn('flex items-center gap-0.5 text-sm flex-wrap', className)} aria-label="Breadcrumb">
       {/* Root folder link */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+      <button
         onClick={() => onNavigate(null)}
+        className={cn(
+          'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors',
+          'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          !currentFolderId && 'text-foreground bg-muted/50 font-medium'
+        )}
       >
-        <Home className="h-4 w-4 mr-1" />
+        <Home className="h-4 w-4" />
         <span>Tài liệu</span>
-      </Button>
+      </button>
 
       {/* Breadcrumb items */}
-      {breadcrumbs.map((folder, index) => (
-        <div key={folder.id} className="flex items-center gap-1">
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 px-2',
-              index === breadcrumbs.length - 1
-                ? 'text-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => onNavigate(folder.id)}
-          >
-            <FolderIcon className="h-4 w-4 mr-1" />
-            <span>{folder.name}</span>
-          </Button>
-        </div>
-      ))}
-    </div>
+      {breadcrumbs.map((folder, index) => {
+        const isLast = index === breadcrumbs.length - 1;
+
+        return (
+          <div key={folder.id} className="flex items-center gap-0.5">
+            {/* Separator */}
+            <ChevronRight className="h-4 w-4 text-muted-foreground/50 mx-1" />
+
+            {/* Folder link */}
+            <button
+              onClick={() => onNavigate(folder.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors',
+                isLast
+                  ? 'text-foreground bg-primary/10 font-medium hover:bg-primary/15'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              )}
+            >
+              <FolderIcon
+                className={cn(
+                  'h-4 w-4',
+                  isLast ? 'text-primary' : 'text-amber-500'
+                )}
+                strokeWidth={1.5}
+                fill="currentColor"
+                fillOpacity={0.15}
+              />
+              <span className="max-w-[150px] truncate">{folder.name}</span>
+            </button>
+          </div>
+        );
+      })}
+    </nav>
   );
 }

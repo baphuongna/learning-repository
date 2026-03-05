@@ -1,8 +1,16 @@
 'use client';
 
 import { LayoutGrid, List } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+/**
+ * ViewToggle Component - EduModern Design System
+ *
+ * Features:
+ * - Modern segmented control style
+ * - Smooth transitions
+ * - Accessible tooltips
+ */
 
 export type ViewMode = 'grid' | 'list';
 
@@ -13,31 +21,35 @@ interface ViewToggleProps {
 
 export function ViewToggle({ viewMode, onViewModeChange }: ViewToggleProps) {
   return (
-    <div className="flex items-center border rounded-md">
-      <Button
-        variant="ghost"
-        size="sm"
+    <div className="flex items-center p-1 bg-muted/50 rounded-lg">
+      <button
         className={cn(
-          'rounded-r-none px-2',
-          viewMode === 'grid' && 'bg-accent'
+          'relative flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200',
+          viewMode === 'grid'
+            ? 'bg-background text-primary shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
         )}
         onClick={() => onViewModeChange('grid')}
         title="Xem dạng lưới"
+        aria-label="Grid view"
+        aria-pressed={viewMode === 'grid'}
       >
         <LayoutGrid className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
+      </button>
+      <button
         className={cn(
-          'rounded-l-none px-2',
-          viewMode === 'list' && 'bg-accent'
+          'relative flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200',
+          viewMode === 'list'
+            ? 'bg-background text-primary shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
         )}
         onClick={() => onViewModeChange('list')}
         title="Xem dạng danh sách"
+        aria-label="List view"
+        aria-pressed={viewMode === 'list'}
       >
         <List className="h-4 w-4" />
-      </Button>
+      </button>
     </div>
   );
 }
