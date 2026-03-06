@@ -119,6 +119,42 @@ export class DocumentsController {
   }
 
   /**
+   * Tìm kiếm tài liệu
+   */
+  @Get('search')
+  @ApiOperation({ summary: 'Tìm kiếm tài liệu' })
+  @ApiQuery({ name: 'q', required: true, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Kết quả tìm kiếm' })
+  async search(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+    @Query('q') query?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const numPage = parseInt(page || '1');
+    const numLimit = parseInt(limit || '10');
+    const keyword = (query || '').trim();
+
+    if (!keyword) {
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: numPage,
+          limit: numLimit,
+          totalPages: 0,
+          query: keyword,
+        },
+      };
+    }
+
+    return this.documentsService.search(keyword, userId, role, numPage, numLimit);
+  }
+
+  /**
    * Download file tài liệu
    */
   @Get(':id/download')

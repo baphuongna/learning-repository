@@ -108,7 +108,7 @@ export function NewsForm({ news }: NewsFormProps) {
 
       // Construct URL - sử dụng endpoint /upload/:filename để serve file
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      const imageUrl = `${baseUrl.replace('/api', '')}/upload/${response.data.filename}`;
+      const imageUrl = `${baseUrl}/upload/${response.data.filename}`;
 
       setFormData((prev) => ({
         ...prev,

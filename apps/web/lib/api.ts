@@ -307,7 +307,7 @@ export const documentsApi = {
    * @returns Paginated search results
    */
   search: async (query: string, page = 1, limit = 10): Promise<PaginatedResponse<Document>> => {
-    const response = await api.get('/search', { params: { q: query, page, limit } });
+    const response = await api.get('/documents/search', { params: { q: query, page, limit } });
     return response.data;
   },
 };
