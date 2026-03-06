@@ -1,15 +1,22 @@
 'use client';
 
-import { useState, from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/providers';
-import { authApi, User } from '@/lib/api';
+import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardBadge } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, User as UserIcon, Mail, Calendar, FileText, Camera } from 'lucide-react';
+
+type ProfileData = {
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+  createdAt?: string;
+  _count?: { documents: number };
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -18,6 +25,7 @@ export default function ProfilePage() {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -25,7 +33,7 @@ export default function ProfilePage() {
   });
 
   // Fetch profile on mount
-  useState(() => {
+  useEffect(() => {
     fetchProfile();
   }, []);
 
@@ -135,12 +143,12 @@ export default function ProfilePage() {
           <div className="text-center p-3 rounded-lg bg-background/50">
             <Calendar className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-xs text-muted-foreground">Tham gia</p>
-            <p className="text-sm font-medium">{user?.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
+            <p className="text-sm font-medium">{profile?.createdAt ? formatDate(profile.createdAt) : 'N/A'}</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-background/50">
             <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-xs text-muted-foreground">Tài liệu</p>
-            <p className="text-sm font-medium">{user?._count?.documents || 0}</p>
+            <p className="text-sm font-medium">{profile?._count?.documents || 0}</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-background/50">
             <UserIcon className="h-5 w-5 mx-auto text-primary mb-1" />

@@ -91,7 +91,7 @@ export class FoldersService {
 
     // Recursively get children for each folder
     const foldersWithChildren = await Promise.all(
-      folders.map(async (folder) => ({
+      folders.map(async (folder: (typeof folders)[number]) => ({
         ...folder,
         children: await this.getTree(userId, role, folder.id),
       }))

@@ -23,48 +23,40 @@ interface GradientTextProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
 }
 
-const GradientText = React.forwardRef<HTMLElement, GradientTextProps>(
-  (
-    {
-      className,
-      variant = 'primary',
-      as: Component = 'span',
-      customGradient,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const gradientClasses = {
-      primary: 'text-gradient-primary',
-      accent: 'text-gradient-accent',
-      custom: '',
-    };
+function GradientText({
+  className,
+  variant = 'primary',
+  as: Component = 'span',
+  customGradient,
+  children,
+  ...props
+}: GradientTextProps) {
+  const gradientClasses = {
+    primary: 'text-gradient-primary',
+    accent: 'text-gradient-accent',
+    custom: '',
+  };
 
-    const style = variant === 'custom' && customGradient ? {
-      background: customGradient,
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-    } : undefined;
+  const style = variant === 'custom' && customGradient ? {
+    background: customGradient,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  } : undefined;
 
-    return (
-      <Component
-        ref={ref}
-        className={cn(
-          variant !== 'custom' && gradientClasses[variant],
-          className
-        )}
-        style={style}
-        {...props}
-      >
-        {children}
-      </Component>
-    );
-  }
-);
-
-GradientText.displayName = 'GradientText';
+  return (
+    <Component
+      className={cn(
+        variant !== 'custom' && gradientClasses[variant],
+        className
+      )}
+      style={style}
+      {...props}
+    >
+      {children}
+    </Component>
+  );
+}
 
 export { GradientText };
 export type { GradientTextProps };

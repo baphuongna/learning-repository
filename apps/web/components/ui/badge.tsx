@@ -122,7 +122,7 @@ const DocumentTypeBadge = ({
   type: 'pdf' | 'doc' | 'xls' | 'ppt' | 'video' | 'audio' | 'image' | 'other';
   className?: string;
 }) => {
-  const variants: Record<string, { variant: typeof badgeVariants; label: string }> = {
+  const variants: Record<string, { variant: NonNullable<BadgeProps['variant']>; label: string }> = {
     pdf: { variant: 'destructive', label: 'PDF' },
     doc: { variant: 'info', label: 'Word' },
     xls: { variant: 'success', label: 'Excel' },
@@ -150,7 +150,7 @@ const StatusBadge = ({
   status: 'active' | 'inactive' | 'pending' | 'deleted';
   className?: string;
 }) => {
-  const variants: Record<string, { variant: typeof badgeVariants; label: string }> = {
+  const variants: Record<string, { variant: NonNullable<BadgeProps['variant']>; label: string }> = {
     active: { variant: 'success', label: 'Hoạt động' },
     inactive: { variant: 'secondary', label: 'Không hoạt động' },
     pending: { variant: 'warning', label: 'Chờ xử lý' },
