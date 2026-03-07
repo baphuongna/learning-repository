@@ -29,7 +29,7 @@ impl AppConfig {
         let port = env::var("RUST_DOC_SERVICE_PORT")
             .ok()
             .and_then(|value| value.parse::<u16>().ok())
-            .unwrap_or(4001);
+            .unwrap_or(3001);
         let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "default-secret".to_string());
         let max_file_size_bytes = env::var("RUST_DOC_SERVICE_MAX_FILE_SIZE_BYTES")
             .ok()
