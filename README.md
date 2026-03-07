@@ -1,9 +1,9 @@
 # 📚 Kho Học Liệu Số - Learning Repository
 
-Hệ thống quản lý tài liệu học tập được xây dựng với **NestJS** (Backend) và **Next.js** (Frontend).
+Hệ thống quản lý tài liệu học tập được xây dựng với **Rust/Axum** (Backend), **Next.js** (Frontend), và `packages/data` cho Prisma schema + SQLite data dùng chung.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-green)
+![Node](https://img.shields.io/badge/node-18%20or%2020%20LTS-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
@@ -73,12 +73,12 @@ Hệ thống quản lý tài liệu học tập được xây dựng với **Nes
                               │ HTTP/REST
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    BACKEND (NestJS 10)                      │
-│  - RESTful API                                              │
+│                 BACKEND (Rust Doc Service)                  │
+│  - Axum HTTP server                                         │
 │  - JWT Authentication                                       │
-│  - Prisma ORM                                               │
-│  - Multer for file upload                                   │
-│  - Swagger documentation                                    │
+│  - sqlx + SQLite/PostgreSQL                                 │
+│  - Local file storage                                       │
+│  - Domain-oriented modules                                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -95,11 +95,15 @@ Hệ thống quản lý tài liệu học tập được xây dựng với **Nes
 
 ### Yêu cầu hệ thống
 
-- Node.js >= 18.0.0
+- Node.js 18 hoặc 20 LTS
 - pnpm >= 9.0.0
 - Docker (optional - cho PostgreSQL/MinIO)
 
-### Bước 1: Clone và cài đặt
+> Khuyến nghị: dùng Node.js 20 LTS cho `apps/web`. Thực tế môi trường Node 24 có thể làm `next lint` lỗi ở bước verify TypeScript/runtime của Next.js 14.1.
+
+> Trạng thái hiện tại đã verify: sau khi cài lại dependencies bằng `pnpm install`, cả `pnpm --filter web lint` và `pnpm --filter web build` đều chạy thành công.
+
+### Bước 1: Clone và cài đặt dependencies
 
 ```bash
 # Vào thư mục project
@@ -112,14 +116,13 @@ pnpm install
 ### Bước 2: Cấu hình môi trường
 
 ```bash
-# Copy file cấu hình cho API
-cp apps/api/.env.example apps/api/.env
-
 # Copy file cấu hình cho Web
 cp apps/web/.env.example apps/web/.env
 ```
 
 ### Bước 3: Khởi tạo database
+
+Đây là bước nên làm đầu tiên sau khi cài dependencies và cấu hình môi trường, trước khi chạy app hoặc verify các bước khác.
 
 ```bash
 # Generate Prisma client
@@ -129,18 +132,39 @@ pnpm db:generate
 pnpm db:push
 
 # (Optional) Seed dữ liệu mẫu
-pnpm --filter api db:seed
+pnpm --filter data db:seed
+```
+
+Nếu database dev bị lỗi và cần tạo lại từ đầu:
+
+```bash
+# macOS / Linux / Git Bash
+rm packages/data/prisma/dev.db
+pnpm db:generate
+pnpm db:push
+pnpm --filter data db:seed
+```
+
+```powershell
+# PowerShell
+Remove-Item .\packages\data\prisma\dev.db -Force
+pnpm db:generate
+pnpm db:push
+pnpm --filter data db:seed
 ```
 
 ### Bước 4: Chạy development servers
 
 ```bash
-# Chạy cả API và Web
-pnpm dev
+# Chạy frontend
+pnpm dev:web
 
-# Hoặc chạy riêng lẻ
-pnpm dev:api   # Backend trên port 3001
-pnpm dev:web   # Frontend trên port 3000
+# Chạy backend runtime
+pnpm dev:rust
+
+# Chạy và lưu log vào tmp/logs/
+pnpm dev:web:log
+pnpm dev:rust:log
 ```
 
 ### Truy cập ứng dụng
@@ -148,8 +172,7 @@ pnpm dev:web   # Frontend trên port 3000
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
-| API | http://localhost:3001/api |
-| Swagger Docs | http://localhost:3001/api/docs |
+| Rust V2 API | http://localhost:4001 |
 
 ---
 
@@ -158,102 +181,35 @@ pnpm dev:web   # Frontend trên port 3000
 ```
 learning-repository/
 ├── apps/
-│   ├── api/                              # NestJS Backend
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma             # Database schema
-│   │   │   ├── seed.ts                   # Dữ liệu mẫu
-│   │   │   └── dev.db                    # SQLite database
-│   │   ├── src/
-│   │   │   ├── main.ts                   # Entry point
-│   │   │   ├── app.module.ts             # Root module
-│   │   │   ├── modules/
-│   │   │   │   ├── auth/                 # Authentication module
-│   │   │   │   │   ├── auth.module.ts
-│   │   │   │   │   ├── auth.controller.ts
-│   │   │   │   │   ├── auth.service.ts
-│   │   │   │   │   ├── strategies/
-│   │   │   │   │   │   └── jwt.strategy.ts
-│   │   │   │   │   └── dto/
-│   │   │   │   │       └── register.dto.ts
-│   │   │   │   ├── documents/            # Documents CRUD module
-│   │   │   │   │   ├── documents.module.ts
-│   │   │   │   │   ├── documents.controller.ts
-│   │   │   │   │   ├── documents.service.ts
-│   │   │   │   │   └── dto/
-│   │   │   │   │       └── create-document.dto.ts
-│   │   │   │   └── upload/               # File upload module
-│   │   │   │       ├── upload.module.ts
-│   │   │   │       ├── upload.controller.ts
-│   │   │   │       └── upload.service.ts
-│   │   │   └── common/
-│   │   │       ├── guards/               # Auth guards
-│   │   │       │   └── jwt-auth.guard.ts
-│   │   │       ├── decorators/           # Custom decorators
-│   │   │       │   ├── current-user.decorator.ts
-│   │   │       │   └── public.decorator.ts
-│   │   │       ├── filters/              # Exception filters
-│   │   │       │   └── http-exception.filter.ts
-│   │   │       └── services/             # Shared services
-│   │   │           ├── prisma.service.ts
-│   │   │           └── prisma.module.ts
-│   │   ├── .env                          # Environment variables
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── nest-cli.json
-│   │
-│   └── web/                              # Next.js Frontend
-│       ├── app/
-│       │   ├── (auth)/                   # Auth pages group
-│       │   │   ├── login/
-│       │   │   │   └── page.tsx
-│       │   │   ├── register/
-│       │   │   │   └── page.tsx
-│       │   │   └── layout.tsx
-│       │   ├── (dashboard)/              # Dashboard pages group
-│       │   │   ├── documents/
-│       │   │   │   ├── page.tsx          # Document list
-│       │   │   │   ├── upload/
-│       │   │   │   │   └── page.tsx      # Upload form
-│       │   │   │   └── [id]/
-│       │   │   │       └── page.tsx      # Document detail
-│       │   │   ├── page.tsx              # Dashboard home
-│       │   │   └── layout.tsx
-│       │   ├── globals.css               # Global styles
-│       │   ├── layout.tsx                # Root layout
-│       │   ├── page.tsx                  # Home redirect
-│       │   └── providers.tsx             # Auth context provider
-│       ├── components/
-│       │   ├── ui/                       # shadcn/ui components
-│       │   │   ├── button.tsx
-│       │   │   ├── card.tsx
-│       │   │   ├── input.tsx
-│       │   │   ├── label.tsx
-│       │   │   ├── badge.tsx
-│       │   │   ├── textarea.tsx
-│       │   │   └── switch.tsx
-│       │   ├── documents/                # Document components
-│       │   │   ├── DocumentCard.tsx
-│       │   │   ├── DocumentList.tsx
-│       │   │   ├── DocumentUpload.tsx
-│       │   │   └── DocumentDetail.tsx
-│       │   └── layout/                   # Layout components
-│       │       ├── Header.tsx
-│       │       └── Sidebar.tsx
-│       ├── lib/
-│       │   ├── api.ts                    # API client
-│       │   └── utils.ts                  # Utility functions
+│   └── web/                              # Next.js frontend
+│       ├── app/                          # App Router pages/layouts
+│       ├── components/                   # Shared + feature components
+│       ├── lib/                          # API clients, helpers, utils
 │       ├── hooks/                        # Custom hooks
-│       ├── types/                        # TypeScript types
-│       ├── .env                          # Environment variables
-│       ├── package.json
-│       ├── tsconfig.json
-│       ├── tailwind.config.ts
-│       └── next.config.js
-│
-├── storage/                              # File storage
-│   └── documents/
-│
-├── docker-compose.yml                    # Docker services
+│       └── package.json
+├── packages/
+│   └── data/                             # Prisma schema + SQLite data package
+│       ├── prisma/
+│       │   ├── schema.prisma             # Database schema
+│       │   ├── seed.ts                   # Seed dữ liệu mẫu
+│       │   └── dev.db                    # SQLite database (dev)
+│       └── package.json
+├── services/
+│   └── rust-doc-service/                 # Rust/Axum backend runtime
+│       ├── src/
+│       │   ├── core/                     # config, db, errors, repository
+│       │   ├── domains/                  # auth, folders, news, inspection
+│       │   ├── http/routes/              # Axum route handlers
+│       │   ├── tests.rs                  # Crate tests
+│       │   └── main.rs
+│       ├── data/uploads/                 # Runtime upload storage
+│       └── Cargo.toml
+├── docs/
+│   ├── GETTING_STARTED.md
+│   └── rust-service/
+├── tmp/logs/                             # Runtime logs from *:log scripts
+├── scripts/                              # Utility scripts (logging, cleanup)
+├── docker-compose.yml                    # Optional local services
 ├── pnpm-workspace.yaml                   # pnpm workspace config
 ├── turbo.json                            # Turborepo config
 ├── package.json                          # Root package.json
@@ -266,7 +222,7 @@ learning-repository/
 
 ### Base URL
 ```
-http://localhost:3001/api
+http://localhost:4001
 ```
 
 ### Authentication
@@ -300,7 +256,7 @@ Authorization: Bearer <token>
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| GET | `/search?q={keyword}` | Tìm kiếm tài liệu | ✅ |
+| GET | `/inspections?limit={n}` | Lịch sử inspect | ✅ |
 
 #### Upload
 
@@ -311,7 +267,7 @@ Authorization: Bearer <token>
 
 ### Chi tiết API
 
-Xem đầy đủ tại Swagger UI: **http://localhost:3001/api/docs**
+Xem thêm trong `docs/rust-service/API.md`.
 
 ---
 
@@ -355,32 +311,25 @@ Xem đầy đủ tại Swagger UI: **http://localhost:3001/api/docs**
 
 ## ⚙️ Cấu hình môi trường
 
-### Backend (apps/api/.env)
+### Shared Prisma data (`packages/data/prisma/dev.db`)
 
 ```env
-# Database
-DATABASE_URL="file:./dev.db"                    # SQLite
-# DATABASE_URL="postgresql://user:pass@localhost:5432/db"  # PostgreSQL
-
-# JWT
+DATABASE_URL="file:./dev.db"
 JWT_SECRET="your-super-secret-jwt-key"
-JWT_EXPIRES_IN="7d"
-
-# App
-PORT=3001
-NODE_ENV=development
-
-# CORS
-CORS_ORIGINS="http://localhost:3000"
-
-# Storage
-UPLOAD_DIR="./uploads"
 ```
 
 ### Frontend (apps/web/.env)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_RUST_V2_URL=http://localhost:4001
+```
+
+### Rust backend runtime
+
+```env
+RUST_DOC_SERVICE_HOST=127.0.0.1
+RUST_DOC_SERVICE_PORT=4001
+JWT_SECRET="your-super-secret-jwt-key"
 ```
 
 ---
@@ -390,18 +339,41 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ### Root level
 
 ```bash
-pnpm dev           # Chạy cả API và Web
-pnpm build         # Build cả hai apps
-pnpm lint          # Kiểm tra code style
-pnpm test          # Chạy tests
+pnpm dev:web       # Chạy frontend
+pnpm dev:web:log   # Chạy frontend và ghi log vào tmp/logs/
+pnpm dev:rust      # Chạy Rust backend runtime
+pnpm dev:rust:log  # Chạy backend và ghi log vào tmp/logs/
+pnpm clean:tmp     # Dọn temp files / logs cũ
+pnpm --filter web build
+pnpm --filter web lint
+cargo test --manifest-path services/rust-doc-service/Cargo.toml
 ```
 
-### Backend (apps/api)
+Frontend hiện có ESLint config tại `apps/web/.eslintrc.json`, nên `pnpm --filter web lint` chạy non-interactive.
+
+### Kiểm tra nhanh theo phạm vi thay đổi
 
 ```bash
-pnpm dev           # Chạy development server
-pnpm build         # Build production
-pnpm start         # Chạy production server
+# Frontend
+pnpm --filter web lint
+pnpm --filter web build
+
+# Rust backend
+cargo build --manifest-path services/rust-doc-service/Cargo.toml
+cargo test --manifest-path services/rust-doc-service/Cargo.toml
+
+# Một Rust test cụ thể
+cargo test --manifest-path services/rust-doc-service/Cargo.toml creates_user_and_reads_profile_count -- --exact
+```
+
+Lưu ý:
+- Frontend hiện chưa có `vitest`, `jest`, hoặc `playwright` config chính thức trong repo.
+- Nếu `pnpm --filter web lint` lỗi trên Node 24, hãy đổi sang Node 18 hoặc 20 LTS trước khi kết luận lỗi thuộc code ứng dụng.
+- Ở trạng thái workspace hiện tại, frontend đã verify pass với `pnpm --filter web lint` và `pnpm --filter web build`.
+
+### Shared data package (`packages/data`)
+
+```bash
 pnpm db:generate   # Generate Prisma client
 pnpm db:push       # Push schema lên database
 pnpm db:migrate    # Tạo migration
@@ -446,7 +418,7 @@ DATABASE_URL="postgresql://..."
 JWT_SECRET="secure-random-string-at-least-32-chars"
 
 # Frontend
-NEXT_PUBLIC_API_URL="https://api.yourdomain.com/api"
+NEXT_PUBLIC_RUST_V2_URL="https://api.yourdomain.com"
 ```
 
 ### 3. Khuyến nghị
@@ -466,13 +438,13 @@ NEXT_PUBLIC_API_URL="https://api.yourdomain.com/api"
 | Frontend | Next.js 14, React 18, TypeScript |
 | Styling | Tailwind CSS, shadcn/ui |
 | Forms | React Hook Form, Zod |
-| Backend | NestJS 10, TypeScript |
+| Backend | Rust, Axum, sqlx |
 | ORM | Prisma |
-| Auth | JWT, Passport.js |
+| Auth | JWT |
 | Database | SQLite (dev) / PostgreSQL (prod) |
 | Storage | Local / MinIO |
 | Cache | Redis (optional) |
-| Docs | Swagger/OpenAPI |
+| Docs | Markdown docs |
 
 ---
 

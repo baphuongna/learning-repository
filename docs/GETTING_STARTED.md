@@ -11,28 +11,28 @@ Tài liệu này là điểm khởi đầu cho người mới tìm hiểu về p
 | Component | Technology | Port |
 |-----------|------------|------|
 | Frontend | Next.js 14 + React 18 | 3000 |
-| Backend | NestJS 10 + Prisma | 3001 |
+| Backend | Rust (Axum) + sqlx | 4001 |
 | Database | SQLite (dev) / PostgreSQL (prod) | - |
 
 ---
 
 ## Tài Liệu Hướng Dẫn Chi Tiết
 
-### Cho người mới bắt đầu
-
 | File | Nội dung |
 |------|----------|
-| [01-prerequisites.md](./guides/01-prerequisites.md) | Kiến thức cần có (JS, TS, React, NestJS) |
-| [02-tech-stack.md](./guides/02-tech-stack.md) | Chi tiết công nghệ sử dụng |
-| [03-project-structure.md](./guides/03-project-structure.md) | Cấu trúc project chi tiết |
-| [04-setup-guide.md](./guides/04-setup-guide.md) | Hướng dẫn cài đặt từng bước |
-| [05-learning-path.md](./guides/05-learning-path.md) | Lộ trình học tập 14 tuần |
-| [06-resources.md](./guides/06-resources.md) | Tài nguyên học tập |
-| [07-faq.md](./guides/07-faq.md) | Câu hỏi thường gặp |
+| [../README.md](../README.md) | Tổng quan setup, kiến trúc hiện tại và lệnh chính |
+| [./rust-service/README.md](./rust-service/README.md) | Tổng quan Rust service và cách chạy |
+| [./rust-service/API.md](./rust-service/API.md) | API hiện tại của backend Rust |
+| [./rust-service/ARCHITECTURE.md](./rust-service/ARCHITECTURE.md) | Kiến trúc backend và luồng xử lý chính |
 
 ---
 
 ## Quick Start
+
+Khuyến nghị môi trường:
+- Node.js 18 hoặc 20 LTS
+- pnpm 9
+- Sau một lần `pnpm install` sạch, repo hiện đã verify pass với frontend lint/build và Rust build/test
 
 ### 1. Cài đặt
 
@@ -45,28 +45,64 @@ cd learning-repository
 pnpm install
 
 # Cấu hình môi trường
-cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
+```
 
+### 2. Khởi tạo database trước
+
+Đây là bước nên chạy trước khi mở app, chạy verify, hoặc debug API/frontend.
+
+```bash
 # Khởi tạo database
 pnpm db:generate
 pnpm db:push
+
+# (Optional) Seed dữ liệu mẫu
+pnpm --filter data db:seed
 ```
 
-### 2. Chạy development
+Nếu database dev bị lỗi và cần tạo lại:
 
 ```bash
-# Chạy cả API và Web
-pnpm dev
+# macOS / Linux / Git Bash
+rm packages/data/prisma/dev.db
+pnpm db:generate
+pnpm db:push
+pnpm --filter data db:seed
 ```
 
-### 3. Truy cập
+```powershell
+# PowerShell
+Remove-Item .\packages\data\prisma\dev.db -Force
+pnpm db:generate
+pnpm db:push
+pnpm --filter data db:seed
+```
+
+### 3. Chạy development
+
+```bash
+# Chạy frontend
+pnpm dev:web
+
+# Chạy Rust backend runtime
+pnpm dev:rust
+
+# Nếu cần lưu log vào thư mục riêng
+pnpm dev:web:log
+pnpm dev:rust:log
+```
+
+Ghi chú:
+- Frontend hiện có ESLint config tại `apps/web/.eslintrc.json`, nên `pnpm --filter web lint` chạy non-interactive.
+- Nếu gặp lỗi Next.js tooling trên Node 24, ưu tiên chuyển sang Node 18 hoặc 20 LTS trước khi debug code ứng dụng.
+
+### 4. Truy cập
 
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
-| Backend API | http://localhost:3001/api |
-| Swagger Docs | http://localhost:3001/api/docs |
+| Rust V2 API | http://localhost:4001 |
 
 ---
 
@@ -85,11 +121,11 @@ pnpm dev
 
 ### Khuyến nghị
 - Next.js App Router
-- NestJS framework
+- Rust backend basics
 - Prisma ORM
 - Tailwind CSS
 
-Chi tiết tại [01-prerequisites.md](./guides/01-prerequisites.md)
+Chi tiết thêm về runtime và cấu trúc repo tại [README.md](../README.md)
 
 ---
 
@@ -98,22 +134,22 @@ Chi tiết tại [01-prerequisites.md](./guides/01-prerequisites.md)
 ```
 learning-repository/
 ├── apps/
-│   ├── api/          # NestJS Backend
-│   │   ├── prisma/   # Database schema
-│   │   └── src/
-│   │       ├── modules/    # Auth, Documents, Upload
-│   │       └── common/     # Guards, Decorators, Services
-│   │
 │   └── web/          # Next.js Frontend
 │       ├── app/      # Pages (App Router)
 │       ├── components/
 │       └── lib/
 │
+├── packages/
+│   └── data/         # Shared Prisma schema + SQLite data
+│
+├── services/
+│   └── rust-doc-service/
+│
 ├── docs/             # Documentation
-└── storage/          # File storage
+└── services/rust-doc-service/data/  # Runtime storage
 ```
 
-Chi tiết tại [03-project-structure.md](./guides/03-project-structure.md)
+Chi tiết runtime hiện tại tại [README.md](../README.md)
 
 ---
 
@@ -121,19 +157,31 @@ Chi tiết tại [03-project-structure.md](./guides/03-project-structure.md)
 
 ```bash
 # Development
-pnpm dev            # Chạy cả API và Web
-pnpm dev:api        # Chỉ Backend
 pnpm dev:web        # Chỉ Frontend
+pnpm dev:rust       # Chỉ Rust backend
+pnpm dev:web:log    # Frontend + log vào tmp/logs/
+pnpm dev:rust:log   # Rust backend + log vào tmp/logs/
 
 # Database
 pnpm db:generate    # Generate Prisma client
 pnpm db:push        # Push schema lên DB
+pnpm --filter data db:seed   # Seed dữ liệu mẫu
 pnpm db:studio      # Mở Prisma Studio
 
-# Build
-pnpm build          # Build tất cả
-pnpm lint           # Kiểm tra code style
+# Verify frontend
+pnpm --filter web lint
+pnpm --filter web build
+
+# Verify Rust backend
+cargo build --manifest-path services/rust-doc-service/Cargo.toml
+cargo test --manifest-path services/rust-doc-service/Cargo.toml
 ```
+
+Baseline verify hiện tại:
+- `pnpm --filter web lint` pass
+- `pnpm --filter web build` pass
+- `cargo build --manifest-path services/rust-doc-service/Cargo.toml` pass
+- `cargo test --manifest-path services/rust-doc-service/Cargo.toml` pass
 
 ---
 
@@ -143,16 +191,16 @@ pnpm lint           # Kiểm tra code style
 |-----------|-----------|----------|
 | 1. Nền tảng | 3 tuần | JS ES6+, TypeScript, Git |
 | 2. Frontend | 3 tuần | React, Next.js, Tailwind |
-| 3. Backend | 4 tuần | NestJS, Prisma, JWT |
+| 3. Backend | 4 tuần | Rust, Axum, sqlx, JWT |
 | 4. Thực hành | 4 tuần | Đọc code, thêm features |
 
-Chi tiết tại [05-learning-path.md](./guides/05-learning-path.md)
+Nếu cần hiểu sâu luồng backend, xem [ARCHITECTURE.md](./rust-service/ARCHITECTURE.md)
 
 ---
 
 ## Gặp Vấn Đề?
 
-1. Xem [07-faq.md](./guides/07-faq.md) cho các lỗi thường gặp
+1. Xem [README.md](../README.md) cho trạng thái setup hiện tại
 2. Tìm kiếm trên Stack Overflow
 3. Đọc documentation của công nghệ tương ứng
 4. Tạo issue trên GitHub
@@ -161,6 +209,6 @@ Chi tiết tại [05-learning-path.md](./guides/05-learning-path.md)
 
 ## Tiếp Theo
 
-1. Đọc [01-prerequisites.md](./guides/01-prerequisites.md) để biết kiến thức cần có
-2. Thực hành theo [04-setup-guide.md](./guides/04-setup-guide.md)
-3. Theo dõi [05-learning-path.md](./guides/05-learning-path.md) để học có hệ thống
+1. Đọc [README.md](../README.md) để nắm kiến trúc V2 hiện tại
+2. Thực hành theo phần Quick Start trong tài liệu này
+3. Đọc [ARCHITECTURE.md](./rust-service/ARCHITECTURE.md) nếu muốn hiểu sâu backend

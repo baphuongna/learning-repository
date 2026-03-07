@@ -7,6 +7,7 @@ dist
 .next
 .turbo
 *.tsbuildinfo
+target
 
 # Environment
 .env
@@ -27,6 +28,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+cargo-debug.log*
+tmp/logs/*
+!tmp/logs/.gitkeep
 
 # Test
 coverage

@@ -71,23 +71,25 @@ Sau đó tạo Pull Request trên GitHub.
 - Định nghĩa types/interfaces rõ ràng
 - Tránh sử dụng `any` trừ khi thực sự cần thiết
 
-### NestJS Backend
+### Rust Backend
 
-```typescript
-// ✅ Good - Sử dụng dependency injection
-@Injectable()
-export class DocumentsService {
-  constructor(private prisma: PrismaService) {}
+```rust
+// ✅ Good - Handler mỏng, business logic tách riêng
+async fn health_check() -> Json<HealthResponse> {
+    Json(HealthResponse { status: "ok".to_string() })
 }
 
-// ✅ Good - Sử dụng DTOs
-export class CreateDocumentDto {
-  @IsString()
-  title: string;
+// ✅ Good - Trả lỗi typed, message an toàn cho người dùng
+fn validate_title(title: &str) -> Result<(), AppError> {
+    if title.trim().is_empty() {
+        return Err(AppError::Validation("title is required".to_string()));
+    }
+
+    Ok(())
 }
 
-// ❌ Bad - Hardcode values
-const token = jwt.sign({ id: 1 }, 'secret');
+// ❌ Bad - Hardcode secret trong source
+let jwt_secret = "secret";
 ```
 
 ### Next.js Frontend

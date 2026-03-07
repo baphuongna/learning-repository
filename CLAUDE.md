@@ -4,15 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kho Học Liệu Số (Learning Repository) - A document management system with NestJS backend and Next.js frontend. Uses pnpm monorepo with Turborepo.
+Kho Học Liệu Số (Learning Repository) - A document management system with Rust backend runtime and Next.js frontend. Uses pnpm monorepo with Turborepo.
 
 ## Commands
 
 ### Development
 ```bash
-pnpm dev              # Run both API (port 3001) and Web (port 3000)
-pnpm dev:api          # Run backend only
 pnpm dev:web          # Run frontend only
+cargo run --manifest-path services/rust-doc-service/Cargo.toml
 ```
 
 ### Database (Backend)
@@ -21,7 +20,7 @@ pnpm db:generate      # Generate Prisma client
 pnpm db:push          # Push schema to database (dev)
 pnpm db:migrate       # Create migration (prod)
 pnpm db:studio        # Open Prisma Studio
-pnpm --filter api db:seed  # Seed sample data
+pnpm --filter data db:seed  # Seed sample data
 ```
 
 ### Build & Test
@@ -36,33 +35,26 @@ pnpm test             # Run tests
 ### Monorepo Structure
 ```
 apps/
-├── api/          # NestJS backend (port 3001)
-│   ├── prisma/   # Database schema, seed
-│   └── src/
-│       ├── modules/
-│       │   ├── auth/       # JWT authentication
-│       │   ├── documents/  # Document CRUD + search
-│       │   └── upload/     # File upload/download
-│       └── common/
-│           ├── guards/     # JwtAuthGuard
-│           ├── decorators/ # @CurrentUser, @Public
-│           └── services/   # PrismaService
-│
 └── web/          # Next.js 14 frontend (port 3000)
     ├── app/
     │   ├── (auth)/       # Login, register pages
     │   ├── (dashboard)/  # Main app pages
     │   └── providers.tsx # Auth context
-    └── lib/api.ts        # Axios client
+    └── lib/api/          # API modules
+
+packages/
+└── data/         # Shared Prisma schema, seed, SQLite data
+
+services/
+└── rust-doc-service/ # Rust backend runtime
 ```
 
 ### Key Patterns
 
 **Backend:**
-- Path alias: `@/*` maps to `src/*`
-- All API routes prefixed with `/api`
-- Use `@Public()` decorator for public endpoints
-- PrismaService injected via constructor
+- Rust V2 runs at `http://localhost:4001`
+- Frontend talks directly to Rust V2
+- Shared Prisma schema still lives in `packages/data/prisma`
 - Soft delete: documents set `status = 'DELETED'`
 
 **Frontend:**
@@ -82,7 +74,7 @@ apps/
 
 ### Authentication
 
-JWT-based with Passport.js:
+JWT-based auth on Rust V2:
 - Login/Register returns `{ accessToken, user }`
 - Token expires in 7 days (configurable)
 - Token sent in `Authorization: Bearer <token>` header
@@ -92,41 +84,36 @@ JWT-based with Passport.js:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/auth/register | Register new user |
-| POST | /api/auth/login | Login |
-| GET | /api/auth/me | Current user info |
-| GET | /api/documents | List documents |
-| GET | /api/documents/my | User's documents |
-| GET | /api/documents/:id | Document detail |
-| POST | /api/documents | Create document (multipart) |
-| PUT | /api/documents/:id | Update metadata |
-| DELETE | /api/documents/:id | Soft delete |
-| GET | /api/search?q=keyword | Search documents |
-| POST | /api/upload | Upload file |
-| GET | /api/upload/:filename | Download file |
+| POST | /auth/register | Register new user |
+| POST | /auth/login | Login |
+| GET | /auth/me | Current user info |
+| GET | /v2/documents | List documents |
+| GET | /v2/documents/my | User's documents |
+| GET | /v2/documents/:id | Document detail |
+| POST | /v2/documents | Create document (multipart) |
+| PUT | /v2/documents/:id | Update metadata |
+| DELETE | /v2/documents/:id | Soft delete |
+| POST | /upload | Upload file |
+| GET | /upload/:filename | Download file |
 
-Swagger UI available at `/api/docs`
+Rust service does not expose Swagger UI in this repo.
 
 ## Environment Variables
 
-**Backend (apps/api/.env):**
+**Shared Prisma data (packages/data/prisma/dev.db):**
 ```env
 DATABASE_URL="file:./dev.db"
 JWT_SECRET="your-secret-key"
-JWT_EXPIRES_IN="7d"
-PORT=3001
-CORS_ORIGINS="http://localhost:3000"
-UPLOAD_DIR="./uploads"
 ```
 
 **Frontend (apps/web/.env):**
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_RUST_V2_URL=http://localhost:4001
 ```
 
 ## File Upload
 
-Files stored in `apps/api/uploads/`. Max size: 100MB.
+Files stored in `services/rust-doc-service/data/uploads/`. Max size: 100MB.
 Supported: PDF, Word, Excel, PowerPoint, Video, Audio, Images.
 
 ## Coding Conventions
@@ -134,6 +121,5 @@ Supported: PDF, Word, Excel, PowerPoint, Video, Audio, Images.
 - TypeScript strict mode enabled
 - JSDoc comments for public APIs
 - File naming: PascalCase components, camelCase services, kebab-case modules
-- Use dependency injection in NestJS
 - Use React hooks (no class components)
 - Conventional Commits for commit messages

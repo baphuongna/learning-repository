@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/providers';
 import { Header } from '@/components/layout/Header';
+import { DashboardBreadcrumb } from '@/components/layout/DashboardBreadcrumb';
 import { Loader2 } from 'lucide-react';
 
 /**
@@ -50,7 +51,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Main Content */}
       <main className="flex-1">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-          {children}
+          <div className="min-w-0 max-w-7xl mx-auto">
+            <DashboardBreadcrumb />
+            {children}
+          </div>
         </div>
       </main>
 

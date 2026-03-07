@@ -7,12 +7,15 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "dev:api": "turbo run dev --filter=api",
+    "dev:rust": "cargo run --manifest-path services/rust-doc-service/Cargo.toml",
     "dev:web": "turbo run dev --filter=web",
-    "db:generate": "pnpm --filter api db:generate",
-    "db:push": "pnpm --filter api db:push",
-    "db:migrate": "pnpm --filter api db:migrate",
-    "db:studio": "pnpm --filter api db:studio"
+    "dev:rust:log": "node scripts/run-with-log.mjs rust-doc-service cargo run --manifest-path services/rust-doc-service/Cargo.toml",
+    "dev:web:log": "node scripts/run-with-log.mjs web-3000 pnpm --filter web dev",
+    "clean:tmp": "node scripts/clean-tmp.mjs",
+    "db:generate": "pnpm --filter data db:generate",
+    "db:push": "pnpm --filter data db:push",
+    "db:migrate": "pnpm --filter data db:migrate",
+    "db:studio": "pnpm --filter data db:studio"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

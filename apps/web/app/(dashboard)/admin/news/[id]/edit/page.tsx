@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { News, newsApi } from '@/lib/api';
 import { NewsForm } from '@/components/news/NewsForm';
@@ -12,13 +12,7 @@ export default function EditNewsPage() {
   const [news, setNews] = useState<News | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchNews(params.id as string);
-    }
-  }, [params.id]);
-
-  const fetchNews = async (id: string) => {
+  const fetchNews = useCallback(async (id: string) => {
     try {
       setLoading(true);
       const data = await newsApi.getById(id);
@@ -29,7 +23,13 @@ export default function EditNewsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (params.id) {
+      void fetchNews(params.id as string);
+    }
+  }, [fetchNews, params.id]);
 
   if (loading) {
     return (

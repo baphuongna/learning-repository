@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
+import { AuthPageGuard } from '@/components/auth/AuthPageGuard';
 
 /**
  * Auth Layout - EduModern Design System
@@ -14,6 +15,8 @@ import { FileText } from 'lucide-react';
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex relative overflow-hidden">
+      <AuthPageGuard />
+
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
 
