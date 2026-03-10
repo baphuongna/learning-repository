@@ -3,13 +3,20 @@ use std::{collections::HashSet, env, path::PathBuf};
 use jsonwebtoken::{EncodingKey, Header};
 use serde::Serialize;
 
-const DEFAULT_ALLOWED_CONTENT_TYPES: [&str; 6] = [
+const DEFAULT_ALLOWED_CONTENT_TYPES: [&str; 13] = [
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "text/plain",
     "image/png",
     "image/jpeg",
+    "video/mp4",
+    "audio/mpeg",
+    "audio/mp3",
 ];
 
 #[derive(Clone, Debug)]
@@ -97,7 +104,11 @@ fn default_sqlite_database_url() -> String {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
 
-    let sqlite_path = repo_root.join("packages").join("data").join("prisma").join("dev.db");
+    let sqlite_path = repo_root
+        .join("packages")
+        .join("data")
+        .join("prisma")
+        .join("dev.db");
     let normalized = sqlite_path.to_string_lossy().replace('\\', "/");
 
     format!("sqlite://{normalized}")
@@ -126,7 +137,12 @@ fn normalize_database_url(value: &str) -> String {
 }
 
 impl AppConfig {
-    pub fn sign_jwt(&self, user_id: &str, email: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    pub fn sign_jwt(
+        &self,
+        user_id: &str,
+        email: &str,
+        role: &str,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         let expiration = (chrono::Utc::now() + chrono::Duration::days(7)).timestamp() as usize;
         let payload = JwtPayload {
             sub: user_id,

@@ -6,11 +6,7 @@ export const rustDocsApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await rustV2Api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await rustV2Api.post('/upload', formData);
 
     return response.data;
   },
@@ -23,11 +19,7 @@ export const rustDocsApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await rustV2Api.post('/inspect', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await rustV2Api.post('/inspect', formData);
 
     return response.data;
   },

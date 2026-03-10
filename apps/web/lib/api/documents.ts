@@ -23,11 +23,7 @@ export const documentsApi = {
   },
 
   create: async (data: FormData): Promise<Document> => {
-    const response = await rustV2Api.post('/v2/documents', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await rustV2Api.post('/v2/documents', data);
     return response.data;
   },
 

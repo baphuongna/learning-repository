@@ -4,13 +4,14 @@ export const RUST_V2_URL = process.env.NEXT_PUBLIC_RUST_V2_URL || 'http://localh
 
 export const rustV2Api = axios.create({
   baseURL: RUST_V2_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 rustV2Api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
+
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (token && config.headers) {
