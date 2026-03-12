@@ -17,8 +17,8 @@ use crate::{
     error::{AppError, AppResult},
     inspection::{inspect_uploaded_file, UploadedFile},
     repository::{
-        cascade_folder_public_status, create_document, find_document_by_id,
-        insert_inspection_history, list_documents, soft_delete_document, update_document,
+        cascade_folder_private_if_empty, cascade_folder_public_status, create_document, find_document_by_id,
+        find_folder_by_id, insert_inspection_history, list_documents, soft_delete_document, update_document,
     },
     storage::persist_uploaded_file,
 };
@@ -78,6 +78,20 @@ pub async fn create_document_handler(
     let uploaded_file = uploaded_file
         .ok_or_else(|| AppError::BadRequest("Expected multipart field named `file`".to_string()))?;
 
+    // Validate folder ownership - user chỉ có thể upload vào folder của mình
+    let folder_id_normalized = normalize_optional_text(folder_id.clone());
+    if let Some(ref fid) = folder_id_normalized {
+        let folder = crate::repository::find_folder_by_id(&state.db_pool, fid)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Thư mục không tồn tại".to_string()))?;
+        
+        if folder.user_id != current_user.id {
+            return Err(AppError::Forbidden(
+                "Bạn không có quyền upload file vào thư mục này".to_string(),
+            ));
+        }
+    }
+
     let inspection = inspect_uploaded_file(&state.config, UploadedFile {
         filename: uploaded_file.filename.clone(),
         content_type: uploaded_file.content_type.clone(),
@@ -108,7 +122,7 @@ pub async fn create_document_handler(
 
     // Auto-share parent folders if document is created as public
     if is_public {
-        if let Some(ref folder_id) = document.folder_id {
+        if let Some(ref folder_id) = document.folderId {
             let _ = cascade_folder_public_status(&state.db_pool, folder_id, true).await;
         }
     }
@@ -227,7 +241,19 @@ pub async fn delete_document_handler(
     }
 
     ensure_can_manage_document(&current_user, &document.user_id)?;
+    
+    // Store folder_id before deletion for cascade check
+    let folder_id = document.folder_id.clone();
+    let was_public = document.is_public;
+    
     soft_delete_document(&state.db_pool, &id).await?;
+
+    // If deleted document was public, check if parent folders should become private
+    if was_public {
+        if let Some(fid) = folder_id {
+            let _ = cascade_folder_private_if_empty(&state.db_pool, &fid).await;
+        }
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -267,19 +293,26 @@ pub async fn update_document_handler(
         payload.keywords = serialize_keywords(&parsed);
     }
 
-    // Check if is_public is being changed from false to true
-    let should_cascade = payload.is_public == Some(true) && !existing.is_public;
+    // Check if is_public is being changed
+    let is_becoming_public = payload.is_public == Some(true) && !existing.is_public;
+    let is_becoming_private = payload.is_public == Some(false) && existing.is_public;
+    let existing_folder_id = existing.folder_id.clone();
 
     let updated = update_document(&state.db_pool, &id, &payload)
         .await?
         .ok_or_else(|| AppError::NotFound("Document not found".to_string()))?;
 
     // Auto-share parent folders if document is being shared
-    if should_cascade {
+    if is_becoming_public {
         if let Some(ref folder_id) = updated.folder_id {
             let _ = cascade_folder_public_status(&state.db_pool, folder_id, true).await;
-            // Note: We intentionally ignore errors here to not fail the document update
-            // The folder cascade is a "best effort" operation
+        }
+    }
+
+    // Cascade private to parent folders if document is becoming private
+    if is_becoming_private {
+        if let Some(folder_id) = existing_folder_id {
+            let _ = cascade_folder_private_if_empty(&state.db_pool, &folder_id).await;
         }
     }
 

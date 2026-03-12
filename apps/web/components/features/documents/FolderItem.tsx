@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Folder, foldersApi } from '@/lib/api';
-import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2, FileText } from 'lucide-react';
+import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2, FileText, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -315,6 +315,14 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
                 {folder._count.documents} tài liệu
               </span>
             )}
+
+            {/* Owner name - always show */}
+            {folder.user && (
+              <span className="text-xs text-muted-foreground/80 mt-0.5 flex items-center gap-1">
+                <User className="h-3 w-3" />
+                {folder.user.fullName}
+              </span>
+            )}
           </div>
         </div>
         {renderDialogs()}
@@ -343,6 +351,14 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
         <span className="font-medium flex-1 truncate text-foreground">
           {folder.name}
         </span>
+
+        {/* Owner name - always show */}
+        {folder.user && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 max-w-24 truncate">
+            <User className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{folder.user.fullName}</span>
+          </span>
+        )}
 
         {/* Document count */}
         {folder._count && (

@@ -94,7 +94,7 @@ pub async fn get_folder_children_handler(
 pub async fn create_folder_handler(
     State(state): State<AppState>,
     current_user: CurrentUser,
-    Json(payload): Json<CreateFolderPayload>,
+    Json(mut payload): Json<CreateFolderPayload>,
 ) -> AppResult<(axum::http::StatusCode, Json<FolderResponse>)> {
     let current_user = current_user.user();
 
@@ -102,6 +102,9 @@ pub async fn create_folder_handler(
     if payload.name.trim().is_empty() {
         return Err(AppError::BadRequest("Tên thư mục không được để trống".to_string()));
     }
+
+    // Force isPublic=false for new folders - folder chỉ public khi có content public
+    payload.is_public = Some(false);
 
     // Check if parent exists and user has permission
     if let Some(parent_id) = payload.parent_id.as_deref() {

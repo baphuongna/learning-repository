@@ -266,7 +266,7 @@ pub async fn create_folder_with_id(
 pub async fn list_documents(
     pool: &SqlitePool,
     current_user_id: &str,
-    current_user_role: &str,
+    _current_user_role: &str,
     page: i64,
     limit: i64,
     folder_id: Option<&str>,
@@ -310,7 +310,7 @@ pub async fn list_documents(
         LEFT JOIN folders f ON f.id = d.folder_id
         WHERE d.status = 'ACTIVE'
           AND (? = 0 OR d.user_id = ?)
-          AND (? = 1 OR ? = 'ADMIN' OR d.user_id = ? OR d.is_public = 1)
+          AND (? = 1 OR d.user_id = ? OR d.is_public = 1)
           AND (
             ? IS NULL
             OR (? = 'null' AND d.folder_id IS NULL)
@@ -331,7 +331,6 @@ pub async fn list_documents(
     .bind(if mine_only { 1 } else { 0 })
     .bind(current_user_id)
     .bind(if mine_only { 1 } else { 0 })
-    .bind(current_user_role)
     .bind(current_user_id)
     .bind(folder_id)
     .bind(folder_id)
@@ -354,7 +353,7 @@ pub async fn list_documents(
         FROM documents d
         WHERE d.status = 'ACTIVE'
           AND (? = 0 OR d.user_id = ?)
-          AND (? = 1 OR ? = 'ADMIN' OR d.user_id = ? OR d.is_public = 1)
+          AND (? = 1 OR d.user_id = ? OR d.is_public = 1)
           AND (
             ? IS NULL
             OR (? = 'null' AND d.folder_id IS NULL)
@@ -373,7 +372,6 @@ pub async fn list_documents(
     .bind(if mine_only { 1 } else { 0 })
     .bind(current_user_id)
     .bind(if mine_only { 1 } else { 0 })
-    .bind(current_user_role)
     .bind(current_user_id)
     .bind(folder_id)
     .bind(folder_id)
@@ -497,7 +495,7 @@ pub async fn update_document(
 pub async fn list_folders(
     pool: &SqlitePool,
     current_user_id: &str,
-    current_user_role: &str,
+    _current_user_role: &str,
     parent_id: Option<&str>,
 ) -> Result<Vec<FolderRecord>, sqlx::Error> {
     sqlx::query_as::<_, FolderRow>(
@@ -524,17 +522,45 @@ pub async fn list_folders(
             (
                 SELECT COUNT(*)
                 FROM documents d
-                WHERE d.folder_id = f.id AND d.status = 'ACTIVE'
+                WHERE d.folder_id = f.id 
+                  AND d.status = 'ACTIVE'
+                  AND (d.user_id = ? OR d.is_public = 1)
             ) AS documents_count,
             (
                 SELECT COUNT(*)
                 FROM folders c
-                WHERE c.parent_id = f.id AND c.status = 'ACTIVE'
+                WHERE c.parent_id = f.id 
+                  AND c.status = 'ACTIVE'
+                  AND (c.user_id = ? OR c.is_public = 1)
             ) AS children_count
         FROM folders f
         INNER JOIN users u ON u.id = f.user_id
         WHERE f.status = 'ACTIVE'
-          AND (? = 'ADMIN' OR f.user_id = ? OR f.is_public = 1)
+          AND (
+            -- User luôn thấy folder của chính mình
+            f.user_id = ?
+            -- Folder public chỉ hiển thị nếu có content public (documents hoặc subfolders)
+            -- Áp dụng cho cả admin và user thường
+            OR (
+              f.is_public = 1
+              AND (
+                -- Có public documents
+                EXISTS (
+                  SELECT 1 FROM documents d 
+                  WHERE d.folder_id = f.id 
+                    AND d.is_public = 1 
+                    AND d.status != 'DELETED'
+                )
+                -- HOẶC có public subfolders (với content public bên trong)
+                OR EXISTS (
+                  SELECT 1 FROM folders sub 
+                  WHERE sub.parent_id = f.id 
+                    AND sub.is_public = 1 
+                    AND sub.status != 'DELETED'
+                )
+              )
+            )
+          )
           AND (
             ? IS NULL
             OR (? = 'null' AND f.parent_id IS NULL)
@@ -543,7 +569,8 @@ pub async fn list_folders(
         ORDER BY f.name ASC
         "#,
     )
-    .bind(current_user_role)
+    .bind(current_user_id)
+    .bind(current_user_id)
     .bind(current_user_id)
     .bind(parent_id)
     .bind(parent_id)
@@ -838,6 +865,162 @@ pub async fn cascade_folder_public_status(
     }
     
     Ok(folder_ids)
+}
+
+/// Check if a folder has any public content (documents or subfolders)
+/// Returns true if the folder contains at least one public document or public subfolder
+pub async fn folder_has_public_content(
+    pool: &SqlitePool,
+    folder_id: &str,
+) -> Result<bool, sqlx::Error> {
+    // Check for public documents in this folder
+    let has_public_docs: bool = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) > 0
+        FROM documents
+        WHERE folder_id = ? 
+          AND is_public = 1 
+          AND status != 'DELETED'
+        "#,
+    )
+    .bind(folder_id)
+    .fetch_one(pool)
+    .await?;
+
+    if has_public_docs {
+        return Ok(true);
+    }
+
+    // Check for public subfolders
+    let has_public_subfolders: bool = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) > 0
+        FROM folders
+        WHERE parent_id = ? 
+          AND is_public = 1 
+          AND status != 'DELETED'
+        "#,
+    )
+    .bind(folder_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(has_public_subfolders)
+}
+
+/// Cascade private status up to parent folders if they no longer have public content.
+/// This is called when a document becomes private or is deleted.
+/// Returns list of folder IDs that were updated.
+pub async fn cascade_folder_private_if_empty(
+    pool: &SqlitePool,
+    folder_id: &str,
+) -> Result<Vec<String>, sqlx::Error> {
+    let mut updated_folder_ids = Vec::new();
+    
+    // Get all ancestor folders (from current folder up to root)
+    let breadcrumbs = get_folder_breadcrumbs(pool, folder_id).await?;
+    
+    // Check from innermost to outermost
+    // We need to check in reverse order (from the folder that had its content changed, up to root)
+    for folder in breadcrumbs.into_iter().rev() {
+        // Skip if folder is already private
+        if !folder.is_public {
+            continue;
+        }
+        
+        // Check if this folder still has any public content
+        let has_public = folder_has_public_content(pool, &folder.id).await?;
+        
+        if !has_public {
+            // No more public content, make this folder private
+            sqlx::query(
+                r#"
+                UPDATE folders
+                SET is_public = 0, updated_at = ?
+                WHERE id = ?
+                "#,
+            )
+            .bind(current_timestamp_millis())
+            .bind(&folder.id)
+            .execute(pool)
+            .await?;
+            
+            updated_folder_ids.push(folder.id);
+        } else {
+            // This folder still has public content, stop cascading
+            // (parent folders should remain public too)
+            break;
+        }
+    }
+    
+    Ok(updated_folder_ids)
+}
+
+/// Cleanup all folders that are marked as public but don't have any public content.
+/// This should be called on server startup or via admin API.
+/// Returns count of folders that were updated.
+pub async fn cleanup_folders_without_public_content(
+    pool: &SqlitePool,
+) -> Result<usize, sqlx::Error> {
+    let mut total_updated = 0;
+    
+    // Run cleanup in a loop until no more folders are updated
+    // This handles nested folder structures where parent folders depend on child folders
+    loop {
+        // Get all folders that are marked as public, ordered by depth (deepest first)
+        // This ensures we process leaf folders before parent folders
+        let public_folders: Vec<String> = sqlx::query_scalar(
+            r#"
+            WITH RECURSIVE folder_depth AS (
+                SELECT id, 0 as depth FROM folders WHERE parent_id IS NULL
+                UNION ALL
+                SELECT f.id, fd.depth + 1
+                FROM folders f
+                INNER JOIN folder_depth fd ON f.parent_id = fd.id
+            )
+            SELECT fd.id
+            FROM folder_depth fd
+            INNER JOIN folders f ON f.id = fd.id
+            WHERE f.is_public = 1 AND f.status != 'DELETED'
+            ORDER BY fd.depth DESC
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let mut updated_this_round = 0;
+
+        for folder_id in public_folders {
+            // Check if this folder has any public content
+            let has_public = folder_has_public_content(pool, &folder_id).await?;
+            
+            if !has_public {
+                // Make this folder private
+                sqlx::query(
+                    r#"
+                    UPDATE folders
+                    SET is_public = 0, updated_at = ?
+                    WHERE id = ?
+                    "#,
+                )
+                .bind(current_timestamp_millis())
+                .bind(&folder_id)
+                .execute(pool)
+                .await?;
+                
+                updated_this_round += 1;
+            }
+        }
+        
+        total_updated += updated_this_round;
+        
+        // If no folders were updated this round, we're done
+        if updated_this_round == 0 {
+            break;
+        }
+    }
+
+    Ok(total_updated)
 }
 
 pub async fn find_user_by_email(

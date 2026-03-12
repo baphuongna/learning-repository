@@ -11,6 +11,7 @@ import { Document, Folder, documentsApi, foldersApi } from '@/lib/api';
 import { Search, Plus, RefreshCw, FileText, FolderPlus, X, Loader2 } from 'lucide-react';
 import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
 import { toast } from 'sonner';
+import { useAuth } from '@/app/providers';
 
 interface DocumentListProps {
   folderId?: string | null;
@@ -20,8 +21,10 @@ interface DocumentListProps {
 
 export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentListProps) {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,9 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+
+  // Check if current user owns this folder
+  const isOwner = !folderId || (currentFolder && currentFolder.userId === currentUser?.id);
 
   const fetchData = useCallback(async (page = 1) => {
     try {
@@ -73,6 +79,24 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
   useEffect(() => {
     void fetchData();
   }, [fetchData, onRefresh]);
+
+  // Fetch current folder info để check ownership
+  useEffect(() => {
+    const fetchCurrentFolder = async () => {
+      if (folderId) {
+        try {
+          const folder = await foldersApi.getById(folderId);
+          setCurrentFolder(folder);
+        } catch (err) {
+          console.error('Failed to fetch current folder:', err);
+          setCurrentFolder(null);
+        }
+      } else {
+        setCurrentFolder(null);
+      }
+    };
+    void fetchCurrentFolder();
+  }, [folderId]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,22 +200,27 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
         </form>
         <div className="flex gap-2 items-center">
           <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-          <Button
-            variant="outline"
-            onClick={() => setShowCreateFolder(!showCreateFolder)}
-          >
-            <FolderPlus className="h-4 w-4 mr-2" />
-            Tạo thư mục
-          </Button>
-          <Button onClick={handleUpload}>
-            <Plus className="h-4 w-4 mr-2" />
-            Tải lên
-          </Button>
+          {/* Chỉ hiện nút tạo thư mục và tải lên khi là owner */}
+          {isOwner && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateFolder(!showCreateFolder)}
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Tạo thư mục
+              </Button>
+              <Button onClick={handleUpload}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tải lên
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Create Folder Dialog */}
-      {showCreateFolder && (
+      {/* Create Folder Dialog - Chỉ hiện khi là owner */}
+      {showCreateFolder && isOwner && (
         <div className="bg-muted/50 border rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium">Tạo thư mục mới</h3>
@@ -324,8 +353,12 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
         <div className="text-center py-20 text-muted-foreground">
           <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">Không tìm thấy tài liệu nào</p>
-          <p className="text-sm">Hãy thử tìm kiếm với từ khóa khác hoặc tải lên tài liệu mới</p>
-          {!showCreateFolder && (
+          <p className="text-sm">
+            {isOwner 
+              ? 'Hãy thử tìm kiếm với từ khóa khác hoặc tải lên tài liệu mới'
+              : 'Thư mục này trống hoặc bạn không có quyền xem nội dung'}
+          </p>
+          {!showCreateFolder && isOwner && (
             <div className="flex gap-2 justify-center mt-4">
               <Button
                 variant="outline"

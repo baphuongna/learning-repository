@@ -109,7 +109,9 @@ pub fn ensure_can_access_document(
     owner_id: &str,
     is_public: bool,
 ) -> Result<(), AppError> {
-    if current_user.role == "ADMIN" || current_user.id == owner_id || is_public {
+    // User chỉ được xem: tài liệu của mình HOẶC tài liệu public
+    // Admin KHÔNG được xem tài liệu riêng tư của user khác
+    if current_user.id == owner_id || is_public {
         return Ok(());
     }
 
@@ -117,7 +119,9 @@ pub fn ensure_can_access_document(
 }
 
 pub fn ensure_can_manage_document(current_user: &AuthUser, owner_id: &str) -> Result<(), AppError> {
-    if current_user.role == "ADMIN" || current_user.id == owner_id {
+    // User chỉ được quản lý tài liệu của chính mình
+    // Admin KHÔNG được quản lý tài liệu của user khác
+    if current_user.id == owner_id {
         return Ok(());
     }
 

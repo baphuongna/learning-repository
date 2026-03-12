@@ -55,6 +55,7 @@ mod tests;
 use app_state::AppState;
 use config::AppConfig;
 use database::{create_pool, run_migrations};
+use repository::cleanup_folders_without_public_content;
 use routes::create_router;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -67,6 +68,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::from_env();
     let db_pool = create_pool(&config).await?;
     run_migrations(&db_pool).await?;
+    
+    // Cleanup folders that are marked as public but don't have public content
+    match cleanup_folders_without_public_content(&db_pool).await {
+        Ok(count) => {
+            info!(folders_updated = count, "folder visibility cleanup completed");
+        }
+        Err(e) => {
+            info!(error = %e, "failed to cleanup folders (non-critical, continuing)");
+        }
+    }
+    
     let address = config.socket_address();
     let listener = tokio::net::TcpListener::bind(&address).await?;
     let app = create_router(AppState::new(config.clone(), db_pool));

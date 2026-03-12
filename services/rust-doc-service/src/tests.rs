@@ -1122,8 +1122,6 @@ mod tests {
             "user-1@example.com",
             "Test User",
             "hash",
-            "USER",
-            None,
         )
         .await
         .expect("user should be created");
@@ -1229,8 +1227,6 @@ mod tests {
             "user-2@example.com",
             "Test User",
             "hash",
-            "USER",
-            None,
         )
         .await
         .expect("user should be created");
