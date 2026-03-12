@@ -597,6 +597,62 @@ pub async fn find_folder_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Fol
     .map(|result| result.map(map_folder_row))
 }
 
+pub async fn find_folder_by_name_and_parent(
+    pool: &SqlitePool,
+    name: &str,
+    parent_id: Option<&str>,
+    user_id: &str,
+) -> Result<Option<FolderRecord>, sqlx::Error> {
+    let parent_condition = if parent_id.is_some() { "parent_id = ?" } else { "parent_id IS NULL" };
+    
+    let query = format!(
+        r#"
+        SELECT
+            f.id,
+            f.name,
+            f.description,
+            f.color,
+            f.parent_id,
+            f.user_id,
+            f.is_public,
+            f.status,
+            CASE
+                WHEN typeof(f.created_at) = 'integer' THEN strftime('%Y-%m-dT%H:%M:%fZ', f.created_at / 1000.0, 'unixepoch')
+                ELSE f.created_at
+            END AS created_at,
+            CASE
+                WHEN typeof(f.updated_at) = 'integer' THEN strftime('%Y-%m-dT%H:%M:%fZ', f.updated_at / 1000.0, 'unixepoch')
+                ELSE f.updated_at
+            END AS updated_at,
+            u."fullName" AS user_name,
+            u.email AS user_email,
+            (
+                SELECT COUNT(*)
+                FROM documents d
+                WHERE d.folder_id = f.id AND d.status = 'ACTIVE'
+            ) AS documents_count,
+            (
+                SELECT COUNT(*)
+                FROM folders c
+                WHERE c.parent_id = f.id AND c.status = 'ACTIVE'
+            ) AS children_count
+        FROM folders f
+        INNER JOIN users u ON u.id = f.user_id
+        WHERE f.name = ? AND f.user_id = ? AND f.status = 'ACTIVE' AND {}
+        "#,
+        parent_condition
+    );
+
+    let mut query = sqlx::query_as::<_, FolderRow>(&query);
+    query = query.bind(name).bind(user_id);
+    
+    if let Some(pid) = parent_id {
+        query = query.bind(pid);
+    }
+    
+    query.fetch_optional(pool).await.map(|result| result.map(map_folder_row))
+}
+
 pub async fn create_folder(
     pool: &SqlitePool,
     user_id: &str,
@@ -737,6 +793,51 @@ pub async fn get_folder_breadcrumbs(
 
     breadcrumbs.reverse();
     Ok(breadcrumbs)
+}
+
+/// Cascade update is_public status for all ancestor folders of a document
+/// Returns list of folder IDs that were updated (for audit/warning purposes)
+pub async fn cascade_folder_public_status(
+    pool: &SqlitePool,
+    folder_id: &str,
+    is_public: bool,
+) -> Result<Vec<String>, sqlx::Error> {
+    // Get all ancestor folders using existing breadcrumbs logic
+    let breadcrumbs = get_folder_breadcrumbs(pool, folder_id).await?;
+    
+    if breadcrumbs.is_empty() {
+        return Ok(Vec::new());
+    }
+    
+    // Filter folders that need updating (only update if different)
+    let folder_ids: Vec<String> = breadcrumbs
+        .iter()
+        .filter(|f| f.is_public != is_public)
+        .map(|f| f.id.clone())
+        .collect();
+    
+    if folder_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    
+    // Batch update all ancestor folders
+    let public_value = if is_public { 1 } else { 0 };
+    for folder_id in &folder_ids {
+        sqlx::query(
+            r#"
+            UPDATE folders
+            SET is_public = ?, updated_at = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(public_value)
+        .bind(current_timestamp_millis())
+        .bind(folder_id)
+        .execute(pool)
+        .await?;
+    }
+    
+    Ok(folder_ids)
 }
 
 pub async fn find_user_by_email(

@@ -50,6 +50,7 @@ model Folder {
   // Quan hệ
   documents   Document[]
 
+  @@unique([userId, name, parentId])
   @@index([userId])
   @@index([parentId])
   @@map("folders")

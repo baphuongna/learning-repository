@@ -7,7 +7,7 @@ use crate::{
     error::{AppError, AppResult},
     folders::{CreateFolderPayload, FolderResponse, UpdateFolderPayload},
     repository::{
-        create_folder, find_folder_by_id, get_folder_breadcrumbs, is_descendant_folder, list_folders,
+        create_folder, find_folder_by_id, find_folder_by_name_and_parent, get_folder_breadcrumbs, is_descendant_folder, list_folders,
         soft_delete_folder, update_folder,
     },
 };
@@ -98,15 +98,33 @@ pub async fn create_folder_handler(
 ) -> AppResult<(axum::http::StatusCode, Json<FolderResponse>)> {
     let current_user = current_user.user();
 
+    // Validate name
     if payload.name.trim().is_empty() {
         return Err(AppError::BadRequest("Tên thư mục không được để trống".to_string()));
     }
 
+    // Check if parent exists and user has permission
     if let Some(parent_id) = payload.parent_id.as_deref() {
         let parent = find_folder_by_id(&state.db_pool, parent_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Thư mục cha không tồn tại".to_string()))?;
         ensure_can_manage_document(&current_user, &parent.user_id)?;
+    }
+
+    // Check for duplicate name in same parent
+    let existing = find_folder_by_name_and_parent(
+        &state.db_pool,
+        &payload.name,
+        payload.parent_id.as_deref(),
+        &current_user.id,
+    )
+    .await
+    .map_err(|e| AppError::Database(e))?;
+
+    if existing.is_some() {
+        return Err(AppError::Conflict(
+            "Đã tồn tại thư mục cùng tên trong thư mục cha".to_string(),
+        ));
     }
 
     let folder = create_folder(&state.db_pool, &current_user.id, &payload).await?;

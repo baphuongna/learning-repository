@@ -17,8 +17,8 @@ use crate::{
     error::{AppError, AppResult},
     inspection::{inspect_uploaded_file, UploadedFile},
     repository::{
-        create_document, find_document_by_id, insert_inspection_history, list_documents,
-        soft_delete_document, update_document,
+        cascade_folder_public_status, create_document, find_document_by_id,
+        insert_inspection_history, list_documents, soft_delete_document, update_document,
     },
     storage::persist_uploaded_file,
 };
@@ -105,6 +105,13 @@ pub async fn create_document_handler(
     let document = create_document(&state.db_pool, &current_user.id, &payload, &stored_file)
         .await?
         .into_response();
+
+    // Auto-share parent folders if document is created as public
+    if is_public {
+        if let Some(ref folder_id) = document.folder_id {
+            let _ = cascade_folder_public_status(&state.db_pool, folder_id, true).await;
+        }
+    }
 
     Ok((StatusCode::CREATED, Json(document)))
 }
@@ -260,9 +267,21 @@ pub async fn update_document_handler(
         payload.keywords = serialize_keywords(&parsed);
     }
 
+    // Check if is_public is being changed from false to true
+    let should_cascade = payload.is_public == Some(true) && !existing.is_public;
+
     let updated = update_document(&state.db_pool, &id, &payload)
         .await?
         .ok_or_else(|| AppError::NotFound("Document not found".to_string()))?;
+
+    // Auto-share parent folders if document is being shared
+    if should_cascade {
+        if let Some(ref folder_id) = updated.folder_id {
+            let _ = cascade_folder_public_status(&state.db_pool, folder_id, true).await;
+            // Note: We intentionally ignore errors here to not fail the document update
+            // The folder cascade is a "best effort" operation
+        }
+    }
 
     Ok(Json(updated.into_response()))
 }

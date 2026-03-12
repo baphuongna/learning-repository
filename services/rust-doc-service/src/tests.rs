@@ -14,7 +14,8 @@ mod tests {
         documents::{DocumentInsertRecord, UpdateDocumentPayload},
         folders::CreateFolderPayload,
         repository::{
-            create_document_with_id, create_folder_with_id, create_user, find_document_by_id,
+            cascade_folder_public_status, create_document_with_id, create_folder_with_id,
+            create_user, find_document_by_id, find_folder_by_id, find_folder_by_name_and_parent,
             get_folder_breadcrumbs, get_profile_by_user_id, update_document,
         },
         routes::create_router,
@@ -984,5 +985,306 @@ mod tests {
             .await
             .expect("status should be queryable");
         assert_eq!(db_status, "ARCHIVED");
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_folder_name_in_same_parent() {
+        let pool = setup_test_db().await;
+        let user = create_user(&pool, "dupe@example.com", "Dupe Tester", "hash")
+            .await
+            .expect("user should be created");
+
+        // Create first folder
+        create_folder_with_id(
+            &pool,
+            "folder-1",
+            &user.id,
+            &CreateFolderPayload {
+                name: "My Folder".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("first folder should be created");
+
+        // Check that duplicate name is detected
+        let existing = find_folder_by_name_and_parent(&pool, "My Folder", None, &user.id)
+            .await
+            .expect("query should work");
+        assert!(existing.is_some(), "should find existing folder with same name");
+
+        // Create another folder with different name - should work
+        create_folder_with_id(
+            &pool,
+            "folder-2",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Another Folder".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("second folder with different name should be created");
+
+        // Verify no duplicate with different name
+        let not_duplicate = find_folder_by_name_and_parent(&pool, "Another Folder", None, &user.id)
+            .await
+            .expect("query should work");
+        assert!(not_duplicate.is_some(), "should find folder with different name");
+    }
+
+    #[tokio::test]
+    async fn allows_same_folder_name_in_different_parents() {
+        let pool = setup_test_db().await;
+        let user = create_user(&pool, "nested@example.com", "Nested Tester", "hash")
+            .await
+            .expect("user should be created");
+
+        // Create parent folder
+        create_folder_with_id(
+            &pool,
+            "parent-folder",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Parent".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("parent folder should be created");
+
+        // Create child folder with name "Sub"
+        create_folder_with_id(
+            &pool,
+            "child-folder-1",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Sub".to_string(),
+                description: None,
+                color: None,
+                parent_id: Some("parent-folder".to_string()),
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("first child folder should be created");
+
+        // Verify duplicate name in same parent is detected
+        let duplicate = find_folder_by_name_and_parent(
+            &pool,
+            "Sub",
+            Some("parent-folder"),
+            &user.id,
+        )
+        .await
+        .expect("query should work");
+        assert!(duplicate.is_some(), "should find existing subfolder");
+
+        // Create another child with same name in root (different parent) - should work
+        create_folder_with_id(
+            &pool,
+            "child-folder-2",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Sub".to_string(),
+                description: None,
+                color: None,
+                parent_id: None, // root, different parent
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("folder with same name in different parent should be created");
+
+        // Verify no duplicate in root
+        let not_duplicate_in_root = find_folder_by_name_and_parent(&pool, "Sub", None, &user.id)
+            .await
+            .expect("query should work");
+        assert!(not_duplicate_in_root.is_some(), "should find subfolder in root");
+    }
+
+    #[tokio::test]
+    async fn cascade_folder_public_status_shares_all_ancestors() {
+        let pool = setup_test_db().await;
+
+        // Create user
+        let user = create_user(
+            &pool,
+            "user-1@example.com",
+            "Test User",
+            "hash",
+            "USER",
+            None,
+        )
+        .await
+        .expect("user should be created");
+
+        // Create folder hierarchy: Root -> Parent -> Child
+        create_folder_with_id(
+            &pool,
+            "root-folder",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Root".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("root folder should be created");
+
+        create_folder_with_id(
+            &pool,
+            "parent-folder",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Parent".to_string(),
+                description: None,
+                color: None,
+                parent_id: Some("root-folder".to_string()),
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("parent folder should be created");
+
+        create_folder_with_id(
+            &pool,
+            "child-folder",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Child".to_string(),
+                description: None,
+                color: None,
+                parent_id: Some("parent-folder".to_string()),
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("child folder should be created");
+
+        // Verify all folders are private initially
+        let root = find_folder_by_id(&pool, "root-folder")
+            .await
+            .expect("query should work")
+            .expect("root should exist");
+        let parent = find_folder_by_id(&pool, "parent-folder")
+            .await
+            .expect("query should work")
+            .expect("parent should exist");
+        let child = find_folder_by_id(&pool, "child-folder")
+            .await
+            .expect("query should work")
+            .expect("child should exist");
+
+        assert!(!root.is_public, "root should be private initially");
+        assert!(!parent.is_public, "parent should be private initially");
+        assert!(!child.is_public, "child should be private initially");
+
+        // Cascade share from child folder
+        let affected = cascade_folder_public_status(&pool, "child-folder", true)
+            .await
+            .expect("cascade should work");
+
+        // Should have affected child, parent, and root (3 folders)
+        assert_eq!(affected.len(), 3, "should have shared 3 folders");
+
+        // Verify all folders are now public
+        let root_after = find_folder_by_id(&pool, "root-folder")
+            .await
+            .expect("query should work")
+            .expect("root should exist");
+        let parent_after = find_folder_by_id(&pool, "parent-folder")
+            .await
+            .expect("query should work")
+            .expect("parent should exist");
+        let child_after = find_folder_by_id(&pool, "child-folder")
+            .await
+            .expect("query should work")
+            .expect("child should exist");
+
+        assert!(root_after.is_public, "root should now be public");
+        assert!(parent_after.is_public, "parent should now be public");
+        assert!(child_after.is_public, "child should now be public");
+    }
+
+    #[tokio::test]
+    async fn cascade_folder_public_status_handles_already_public_folders() {
+        let pool = setup_test_db().await;
+
+        // Create user
+        let user = create_user(
+            &pool,
+            "user-2@example.com",
+            "Test User",
+            "hash",
+            "USER",
+            None,
+        )
+        .await
+        .expect("user should be created");
+
+        // Create folder hierarchy with one already public
+        create_folder_with_id(
+            &pool,
+            "public-root",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Public Root".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(true), // Already public
+            },
+        )
+        .await
+        .expect("public root should be created");
+
+        create_folder_with_id(
+            &pool,
+            "private-child",
+            &user.id,
+            &CreateFolderPayload {
+                name: "Private Child".to_string(),
+                description: None,
+                color: None,
+                parent_id: Some("public-root".to_string()),
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("private child should be created");
+
+        // Cascade share from child
+        let affected = cascade_folder_public_status(&pool, "private-child", true)
+            .await
+            .expect("cascade should work");
+
+        // Should only affect the child (parent is already public)
+        assert_eq!(affected.len(), 1, "should only share 1 folder (the child)");
+        assert_eq!(affected[0], "private-child", "should be the child folder");
+    }
+
+    #[tokio::test]
+    async fn cascade_folder_public_status_handles_nonexistent_folder() {
+        let pool = setup_test_db().await;
+
+        // Cascade share with nonexistent folder should return empty list
+        let affected = cascade_folder_public_status(&pool, "nonexistent-folder", true)
+            .await
+            .expect("cascade should not fail for nonexistent folder");
+
+        assert!(affected.is_empty(), "should return empty list for nonexistent folder");
     }
 }

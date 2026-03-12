@@ -14,6 +14,7 @@ pub enum AppError {
     BadRequest(String),
     Forbidden(String),
     NotFound(String),
+    Conflict(String), // New: for duplicate resources
     Internal(String),
     PayloadTooLarge { limit_bytes: usize, actual_bytes: usize },
     UnsupportedContentType { received: String },
@@ -38,6 +39,7 @@ impl IntoResponse for AppError {
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", message),
             Self::Forbidden(message) => (StatusCode::FORBIDDEN, "FORBIDDEN", message),
             Self::NotFound(message) => (StatusCode::NOT_FOUND, "NOT_FOUND", message),
+            Self::Conflict(message) => (StatusCode::CONFLICT, "CONFLICT", message),
             Self::Internal(message) => {
                 error!(message = %message, "internal application error");
                 (
