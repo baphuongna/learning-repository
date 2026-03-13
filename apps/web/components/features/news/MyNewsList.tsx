@@ -1,19 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NewsCard } from './NewsCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { News, newsApi } from '@/lib/api';
-import { Search, RefreshCw, Trash2, Edit, FileText, Plus } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Edit, FileText, Plus, Loader2 } from 'lucide-react';
+import { ContextBar } from '@/components/features/layout/ContextBar';
+import { toast } from 'sonner';
 
 interface MyNewsListProps {
   onDelete?: (id: string) => void;
+  onRefresh?: number;
 }
 
-export function MyNewsList({ onDelete }: MyNewsListProps) {
+export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
   const router = useRouter();
   const [news, setNews] = useState<News[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +31,7 @@ export function MyNewsList({ onDelete }: MyNewsListProps) {
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchNews = async (page = 1) => {
+  const fetchNews = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
@@ -40,28 +44,63 @@ export function MyNewsList({ onDelete }: MyNewsListProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchNews();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc muốn xóa bài viết này?')) {
-      return;
-    }
+  useEffect(() => {
+    void fetchNews();
+  }, [fetchNews, onRefresh]);
 
+  const handleDelete = async (id: string) => {
     try {
       setDeletingId(id);
       await newsApi.delete(id);
       await fetchNews(meta.page);
       onDelete?.(id);
+      toast.success('Đã xóa bài viết thành công');
     } catch (err) {
       console.error('Failed to delete news:', err);
-      alert('Không thể xóa bài viết. Vui lòng thử lại.');
+      toast.error('Không thể xóa bài viết. Vui lòng thử lại.');
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const confirmDelete = (id: string, title: string) => {
+    // Sử dụng toast với action thay vì confirm dialog
+    toast(
+      <div className="space-y-3">
+        <p className="font-medium">Xác nhận xóa bài viết?</p>
+        <p className="text-sm text-muted-foreground">&ldquo;{title}&rdquo;</p>
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toast.dismiss()}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              toast.dismiss();
+              handleDelete(id);
+            }}
+          >
+            Xóa
+          </Button>
+        </div>
+      </div>,
+      { duration: 10000 }
+    );
+  };
+
+  const handleRefresh = () => {
+    void fetchNews();
+  };
+
+  const handleCreateNew = () => {
+    router.push('/my-news/create');
   };
 
   // Filter local khi search
@@ -83,29 +122,27 @@ export function MyNewsList({ onDelete }: MyNewsListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
-          <Input
-            type="text"
-            placeholder="Tìm kiếm trong bài viết của bạn..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => fetchNews()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Làm mới
-          </Button>
-          <Button onClick={() => router.push('/my-news/create')}>
+      {/* Context Bar - Search and Actions */}
+      <ContextBar
+        search={
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Input
+              type="text"
+              placeholder="Tìm kiếm trong bài viết của bạn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        }
+        actions={
+          <Button onClick={handleCreateNew}>
             <Plus className="h-4 w-4 mr-2" />
             Viết bài mới
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Error Message */}
       {error && (
@@ -118,22 +155,42 @@ export function MyNewsList({ onDelete }: MyNewsListProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredNews.map((item) => (
           <div key={item.id} className="relative group">
+            {/* Status Badge */}
+            <div className="absolute top-2 left-2 z-10">
+              {item.isPublished ? (
+                <Badge variant="success" className="shadow-sm text-xs">
+                  Đã đăng
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="shadow-sm text-xs">
+                  Bản nháp
+                </Badge>
+              )}
+              {item.isFeatured && (
+                <Badge variant="accent" className="shadow-sm ml-1 text-xs">
+                  Nổi bật
+                </Badge>
+              )}
+            </div>
+
             <NewsCard news={item} />
-            {/* Action Buttons */}
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+            {/* Action Buttons - Luôn hiển thị, rõ ràng hơn khi hover */}
+            <div className="absolute top-2 right-2 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
               <Link href={`/my-news/${item.id}/edit`}>
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" className="shadow-sm">
                   <Edit className="h-4 w-4" />
                 </Button>
               </Link>
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => handleDelete(item.id)}
+                className="shadow-sm"
+                onClick={() => confirmDelete(item.id, item.title)}
                 disabled={deletingId === item.id}
               >
                 {deletingId === item.id ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
@@ -156,7 +213,7 @@ export function MyNewsList({ onDelete }: MyNewsListProps) {
               : 'Hãy bắt đầu viết bài đầu tiên của bạn'}
           </p>
           {!searchQuery && (
-            <Button onClick={() => router.push('/my-news/create')}>
+            <Button onClick={handleCreateNew}>
               <Plus className="h-4 w-4 mr-2" />
               Viết bài mới
             </Button>
