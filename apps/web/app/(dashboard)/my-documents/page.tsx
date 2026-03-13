@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import { MyDocumentList } from '@/components/documents/MyDocumentList';
+import { PageHeader } from '@/components/features/layout/PageHeader';
 import { Loader2 } from 'lucide-react';
 
 function MyDocumentListFallback() {
@@ -15,12 +16,11 @@ function MyDocumentListFallback() {
 export default function MyDocumentsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Tài liệu của tôi</h1>
-        <p className="text-muted-foreground">
-          Quản lý các tài liệu bạn đã tải lên
-        </p>
-      </div>
+      {/* Page Header */}
+      <PageHeader
+        title="Tài liệu của tôi"
+        description="Quản lý các tài liệu bạn đã tải lên"
+      />
 
       <Suspense fallback={<MyDocumentListFallback />}>
         <MyDocumentList />

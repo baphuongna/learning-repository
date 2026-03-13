@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Document, Folder, documentsApi, foldersApi } from '@/lib/api';
 import { Search, Plus, RefreshCw, FileText, FolderPlus, X, Loader2 } from 'lucide-react';
 import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
+import { ContextBar } from '@/components/features/layout/ContextBar';
 import { toast } from 'sonner';
 import { useAuth } from '@/app/providers';
 
@@ -179,29 +180,29 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb Navigation */}
-      <FolderBreadcrumb
-        currentFolderId={folderId ?? null}
-        onNavigate={handleNavigate}
-        className="mb-4"
-      />
-
-      {/* Search & Actions Bar */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <form onSubmit={handleSearch} className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
-          <Input
-            type="text"
-            placeholder="Tìm kiếm tài liệu..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+      {/* Context Bar - Breadcrumb, Search, View Toggle, Actions */}
+      <ContextBar
+        breadcrumb={
+          <FolderBreadcrumb
+            currentFolderId={folderId ?? null}
+            onNavigate={handleNavigate}
           />
-        </form>
-        <div className="flex gap-2 items-center">
-          <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-          {/* Chỉ hiện nút tạo thư mục và tải lên khi là owner */}
-          {isOwner && (
+        }
+        search={
+          <form onSubmit={handleSearch} className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Input
+              type="text"
+              placeholder="Tìm kiếm tài liệu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </form>
+        }
+        viewToggle={<ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />}
+        actions={
+          isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -215,9 +216,9 @@ export function DocumentList({ folderId, onRefresh, onFolderChange }: DocumentLi
                 Tải lên
               </Button>
             </>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {/* Create Folder Dialog - Chỉ hiện khi là owner */}
       {showCreateFolder && isOwner && (
