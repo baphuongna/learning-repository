@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, CardContent, CardBadge } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { News } from '@/lib/api';
 import { Calendar, User, Eye, Clock, ArrowRight } from 'lucide-react';
@@ -12,13 +12,15 @@ import { Calendar, User, Eye, Clock, ArrowRight } from 'lucide-react';
  * Variants:
  * - default: Standard vertical card
  * - featured: Large hero card with overlay
+ * - hero: Magazine layout hero card (full-width overlay)
+ * - medium: Horizontal card for sidebar
  * - compact: Small horizontal card
  * - horizontal: Full-width horizontal layout
  */
 
 interface NewsCardProps {
   news: News;
-  variant?: 'default' | 'featured' | 'compact' | 'horizontal';
+  variant?: 'default' | 'featured' | 'hero' | 'medium' | 'compact' | 'horizontal';
 }
 
 export function NewsCard({ news, variant = 'default' }: NewsCardProps) {
@@ -44,12 +46,12 @@ export function NewsCard({ news, variant = 'default' }: NewsCardProps) {
     return formatDate(date);
   };
 
-  // Featured variant - large hero card with overlay
-  if (variant === 'featured') {
+  // Hero variant - large card with overlay for magazine layout
+  if (variant === 'hero') {
     return (
       <Card variant="interactive" className="overflow-hidden group h-full">
         <Link href={`/news/${news.slug}`} className="block h-full">
-          <div className="relative h-72 md:h-80 overflow-hidden">
+          <div className="relative h-[280px] md:h-[400px] lg:h-[480px] overflow-hidden">
             {news.thumbnailUrl ? (
               <img
                 src={news.thumbnailUrl}
@@ -63,20 +65,107 @@ export function NewsCard({ news, variant = 'default' }: NewsCardProps) {
             )}
             {/* Gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
             {/* Category badge */}
             <div className="absolute top-4 left-4">
               <Badge variant="accent" className="shadow-lg">
                 {news.category.name}
               </Badge>
             </div>
-
             {/* Content overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
               <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 line-clamp-2 group-hover:text-accent transition-colors">
                 {news.title}
               </h2>
-              <p className="text-white/80 line-clamp-2 mb-4">{news.summary}</p>
+              <p className="text-sm text-white/80 line-clamp-1 mb-4">{news.summary}</p>
+              <div className="flex items-center gap-4 text-sm text-white/70">
+                <span className="flex items-center gap-1.5">
+                  <User className="h-4 w-4" />
+                  {news.user.fullName}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  {formatDate(news.publishedAt || news.createdAt)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Link>
+      </Card>
+    );
+  }
+
+  // Medium variant - horizontal card for magazine layout sidebar
+  if (variant === 'medium') {
+    return (
+      <Card variant="interactive" className="overflow-hidden group">
+        <Link href={`/news/${news.slug}`} className="flex gap-3 p-3 hover:bg-muted/50 transition-colors">
+          {/* Thumbnail */}
+          {news.thumbnailUrl ? (
+            <div className="relative w-24 h-16 lg:w-[120px] lg:h-[80px] flex-shrink-0 rounded-lg overflow-hidden">
+              <img
+                src={news.thumbnailUrl}
+                alt={news.title}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            </div>
+          ) : (
+            <div className="w-24 h-16 lg:w-[120px] lg:h-[80px] flex-shrink-0 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center">
+              <span className="text-xl opacity-50">📄</span>
+            </div>
+          )}
+          {/* Content */}
+          <div className="flex-1 min-w-0 py-0.5">
+            <Badge variant="soft" size="sm" className="mb-1">
+              {news.category.name}
+            </Badge>
+            <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+              {news.title}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+              <span>{news.user.fullName}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatRelativeTime(news.publishedAt || news.createdAt)}
+              </span>
+            </p>
+          </div>
+        </Link>
+      </Card>
+    );
+  }
+
+  // Featured variant - large hero card with overlay
+  if (variant === 'featured') {
+    return (
+      <Card variant="interactive" className="overflow-hidden group h-full">
+        <Link href={`/news/${news.slug}`} className="block h-full">
+          <div className="relative h-72 md:h-80 lg:h-[480px] overflow-hidden">
+            {news.thumbnailUrl ? (
+              <img
+                src={news.thumbnailUrl}
+                alt={news.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20 flex items-center justify-center">
+                <div className="text-6xl opacity-50">📰</div>
+              </div>
+            )}
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            {/* Category badge */}
+            <div className="absolute top-4 left-4">
+              <Badge variant="accent" className="shadow-lg">
+                {news.category.name}
+              </Badge>
+            </div>
+            {/* Content overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+              <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 line-clamp-2 group-hover:text-accent transition-colors">
+                {news.title}
+              </h2>
+              <p className="text-sm text-white/80 line-clamp-1 mb-4">{news.summary}</p>
               <div className="flex items-center gap-4 text-sm text-white/70">
                 <span className="flex items-center gap-1.5">
                   <User className="h-4 w-4" />

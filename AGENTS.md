@@ -1,36 +1,34 @@
 # AGENTS.md
-Guide for autonomous coding agents working in this repository.
+Guide for autonomous coding agents in this repository.
 
 ## Repository Snapshot
-- Monorepo managed with `pnpm` workspaces and `turbo`.
-- Frontend app: `apps/web` using Next.js 14 App Router, TypeScript, Tailwind CSS.
-- Shared data package: `packages/data` for Prisma schema, seed, and SQLite data workflows.
-- Primary backend service: `services/rust-doc-service` using Rust, Axum, SQLx, and SQLite.
+- Monorepo with `pnpm` workspaces and `turbo`.
+- Frontend: `apps/web` (Next.js 14, TypeScript, Tailwind CSS).
+- Data package: `packages/data` (Prisma schema, SQLite dev workflows).
+- Backend: `services/rust-doc-service` (Rust, Axum, SQLx, SQLite).
 - Package manager: `pnpm@9.0.0`.
-- Recommended Node.js runtime: `18` or `20` LTS for frontend stability.
 - Rust edition: `2024`.
-- Workspace root in this environment: `E:\work\AI\store\learning-repository`.
+- Workspace root: `D:\my\learning-repository`.
 
 ## Important Paths
-- Web routes and layouts: `apps/web/app/*`
-- Web shared components: `apps/web/components/*`
-- Web API helpers and utilities: `apps/web/lib/*`
-- Shared UI primitives: `apps/web/components/shared/ui/*`
-- Prisma schema and seed: `packages/data/prisma/*`
-- Rust service source: `services/rust-doc-service/src/*`
-- Rust HTTP routes: `services/rust-doc-service/src/http/routes/*`
-- Rust core modules: `services/rust-doc-service/src/core/*`
-- Rust domain modules: `services/rust-doc-service/src/domains/*`
-- Rust service docs: `docs/rust-service/*`
+- `apps/web/app/*` (routes and layouts)
+- `apps/web/components/*` (UI components)
+- `apps/web/lib/api/*` (web API clients)
+- `apps/web/components/shared/ui/*` (shared primitives)
+- `packages/data/prisma/*` (schema and seed)
+- `services/rust-doc-service/src/*` (backend source)
+- `services/rust-doc-service/src/http/routes/*` (HTTP handlers)
+- `services/rust-doc-service/src/core/*` (core infra)
+- `services/rust-doc-service/src/domains/*` (domain logic)
 
-## High-Priority Rule Files
-- Checked and not found: `.cursorrules`
-- Checked and not found: `.cursor/rules/`
-- Checked and not found: `.github/copilot-instructions.md`
-- If any of these files are added later, treat them as higher priority than this document and update `AGENTS.md` accordingly.
+## Cursor/Copilot Rule Files
+- Checked `.cursorrules`: not found.
+- Checked `.cursor/rules/`: not found.
+- Checked `.github/copilot-instructions.md`: not found.
+- If these files are added later, they override this guide.
 
-## Root Commands
-Run from repository root unless noted otherwise:
+## Build, Lint, Test Commands
+Run from repository root:
 
 ```bash
 pnpm install
@@ -38,10 +36,7 @@ pnpm build
 pnpm lint
 pnpm test
 pnpm dev:web
-pnpm dev:web:log
 pnpm dev:rust
-pnpm dev:rust:log
-pnpm clean:tmp
 pnpm db:generate
 pnpm db:push
 pnpm db:migrate
@@ -49,7 +44,7 @@ pnpm db:studio
 pnpm --filter data db:seed
 ```
 
-## App-Scoped Commands
+## Package-Scoped Commands
 Web app:
 
 ```bash
@@ -59,7 +54,7 @@ pnpm --filter web start
 pnpm --filter web lint
 ```
 
-Shared data package:
+Data package:
 
 ```bash
 pnpm --filter data db:generate
@@ -69,7 +64,7 @@ pnpm --filter data db:studio
 pnpm --filter data db:seed
 ```
 
-Rust doc service:
+Rust service:
 
 ```bash
 cargo run --manifest-path services/rust-doc-service/Cargo.toml
@@ -77,138 +72,107 @@ cargo build --manifest-path services/rust-doc-service/Cargo.toml
 cargo test --manifest-path services/rust-doc-service/Cargo.toml
 ```
 
-## Single-Test Commands
-Use these when changing a small, isolated behavior:
+## Running a Single Test (Important)
+Rust tests currently live in `services/rust-doc-service/src/tests.rs`.
 
 ```bash
-# Run one Rust test by substring
+# By test-name substring
 cargo test --manifest-path services/rust-doc-service/Cargo.toml creates_user_and_reads_profile_count
 
-# Run one Rust test exactly
+# Exact single test
 cargo test --manifest-path services/rust-doc-service/Cargo.toml creates_user_and_reads_profile_count -- --exact
 
-# Run one Rust test and show log output
+# Exact single test with logs
 cargo test --manifest-path services/rust-doc-service/Cargo.toml creates_user_and_reads_profile_count -- --exact --nocapture
 
-# Run tests in a specific Rust module file by substring
+# Filter by topic/module keyword
 cargo test --manifest-path services/rust-doc-service/Cargo.toml folder
 ```
 
 Notes:
-- Current Rust tests live in `services/rust-doc-service/src/tests.rs` as crate unit/integration-style tests.
-- There is no dedicated frontend test runner configured right now (`vitest`, `jest`, and `playwright` configs are absent).
-- Frontend lint is configured via `apps/web/.eslintrc.json`, so `pnpm --filter web lint` runs non-interactively.
-- For frontend changes, verify with `pnpm --filter web lint` and `pnpm --filter web build`, then document manual test steps.
+- No dedicated frontend test runner is configured (no Vitest/Jest/Playwright configs).
+- Frontend verification is `lint + build + manual checks`.
+- Root `pnpm test` uses `turbo run test`; backend confidence depends on `cargo test`.
 
-## Verification Expectations
-- Frontend-only changes: run `pnpm --filter web lint` and `pnpm --filter web build`.
-- Prisma or schema changes: run the relevant `pnpm --filter data db:*` command you touched.
-- Rust service changes: run `cargo build --manifest-path services/rust-doc-service/Cargo.toml` and `cargo test --manifest-path services/rust-doc-service/Cargo.toml`.
-- Cross-cutting changes: run both web and Rust verification relevant to the touched areas.
-- Current known-good verification baseline: `pnpm --filter web lint`, `pnpm --filter web build`, and `cargo test --manifest-path services/rust-doc-service/Cargo.toml` pass in this repo after a clean `pnpm install`.
-- Always report actual command outcomes, not assumed success.
+## Verification Matrix
+- Frontend-only changes:
+  - `pnpm --filter web lint`
+  - `pnpm --filter web build`
+- Prisma/data changes:
+  - run touched `pnpm --filter data db:*` commands
+- Rust changes:
+  - `cargo build --manifest-path services/rust-doc-service/Cargo.toml`
+  - `cargo test --manifest-path services/rust-doc-service/Cargo.toml`
+- Cross-cutting changes:
+  - run both frontend and Rust verification
+- Always report actual command outcomes.
 
-## Architecture Notes
-- Treat `apps/web` as the user-facing frontend.
-- Treat `services/rust-doc-service` as the active backend runtime.
-- Treat `packages/data` as the Prisma/shared data package, not as the HTTP backend.
-- Rust routes are exposed directly without an `/api` prefix unless existing code already does otherwise.
-- Preserve soft-delete behavior where rows use `status = 'DELETED'`.
+## Architecture and Boundaries
+- `apps/web` is the user-facing app.
+- `services/rust-doc-service` is the active backend runtime.
+- `packages/data` is shared schema/data tooling, not runtime API.
+- Keep route handlers thin; move business logic into `core`/`domains`.
+- Preserve soft-delete behavior (`status = 'DELETED'`) where applicable.
 
-## TypeScript Guidelines
-- Write new frontend logic in TypeScript.
-- Preserve `strict: true` in `apps/web/tsconfig.json`.
-- Avoid `any`; prefer explicit interfaces, DTOs, utility types, or inferred types.
-- For Zod-backed forms, prefer `z.infer<typeof schema>`.
-- Prefer narrow request and response types over loose records.
-- Use the existing alias `@/* -> apps/web/*` when it improves clarity.
-- Match local style: single quotes, semicolons, and `import type` for type-only imports.
+## Code Style Guidelines
 
-## Rust Guidelines
-- Keep Axum handlers thin; move business logic into focused domain or core modules.
-- Keep SQLx queries in repository-style modules such as `src/core/repository.rs`.
-- Prefer explicit structs and enums over ad hoc maps or tuples.
-- Return `AppResult<T>` and typed `AppError` variants for HTTP-facing code.
-- Keep configuration centralized in `src/core/config.rs`.
-- Keep database setup and migrations in `src/core/database.rs`.
-- Add tests around pure business rules before adding broader HTTP-path tests.
-
-## Imports and File Organization
-- Group imports as: framework/runtime, third-party, internal alias or relative.
-- Mirror the surrounding file before reordering aggressively.
+### Imports and Modules
+- Group imports: framework/runtime, third-party, internal alias/relative.
+- Follow nearby import ordering; avoid reorder-only diffs.
 - Remove unused imports.
-- Keep one file focused on one responsibility.
-- Do not mix route handlers, DTOs, persistence logic, and unrelated helpers in one file.
-- In Rust, follow the existing split: `core`, `domains`, and `http`.
+- Use `import type` for TypeScript type-only imports.
+- Keep files single-responsibility.
 
-## Naming Conventions
-- React components and component filenames: `PascalCase`.
-- Functions, variables, hooks, and helpers: `camelCase`.
-- Type aliases, interfaces, and Rust structs/enums: descriptive `PascalCase`.
-- Constants: follow nearby conventions; use uppercase only for true constants.
-- Prefer clear domain names over abbreviations.
-
-## Formatting and Structure
-- Follow the formatting already implied by the current codebase and toolchain.
-- Keep functions small and focused.
-- Prefer guard clauses and early returns over deep nesting.
-- Avoid broad refactors unless the task requires them.
-- Keep quote style and semicolon usage consistent with the surrounding file.
+### Formatting
+- Follow existing formatting and lint rules.
+- In web code, match local style: single quotes and semicolons.
+- Prefer small functions and early returns.
+- Keep nesting shallow.
 - Add comments only for non-obvious logic.
-- Preserve meaningful Vietnamese comments that already exist.
+- Preserve meaningful Vietnamese comments already in code.
 
-## Frontend Conventions
-- Follow the existing App Router structure and route groups such as `(auth)` and `(dashboard)`.
-- Add `'use client'` only when a component actually needs client-side hooks, browser APIs, or event handlers.
-- Reuse primitives from `apps/web/components/shared/ui` before creating new ones.
-- Use the shared `cn` helper for conditional Tailwind class composition.
-- Centralize HTTP calls in `apps/web/lib/api/*`.
-- Handle loading, empty, success, and error states explicitly on data-driven pages.
-- Preserve the current `401` flow in the Axios interceptor: clear auth state and redirect to `/login`.
+### TypeScript and Frontend
+- Keep `strict: true` behavior in `apps/web/tsconfig.json`.
+- Avoid `any`; prefer explicit interfaces/types and narrow DTOs.
+- Use `z.infer<typeof schema>` for Zod-backed forms.
+- Use alias `@/*` when it improves readability.
+- Centralize API calls in `apps/web/lib/api/*`.
+- Preserve existing 401 behavior in API client (clear auth and redirect `/login`).
+- Add `'use client'` only when client-only hooks/APIs/events are required.
 
-## Backend Conventions
-- Keep authorization checks explicit in the route or service flow.
-- Validate input at module boundaries.
-- Normalize user-provided strings before persistence when the existing code does so.
-- Return user-safe error messages; never leak SQL, stack traces, tokens, or secrets.
-- Prefer fail-fast validation and explicit permission checks.
-- Keep file-upload validation aligned with configured limits and allowed content types.
+### Rust and Backend
+- Use `AppResult<T>` and typed `AppError` for HTTP-facing paths.
+- Keep SQLx access in repository-style modules.
+- Validate input at boundaries and fail fast.
+- Prefer explicit structs/enums over ad hoc tuple/map shapes.
+- Keep config in `src/core/config.rs`; DB setup in `src/core/database.rs`.
+- Return safe client-facing errors; never expose SQL, stack traces, tokens, or secrets.
 
-## Error Handling
-- In TypeScript, catch async failures where the UI needs to recover and clean up loading state in `finally`.
-- In Rust, use `AppError` variants like `BadRequest`, `Forbidden`, `NotFound`, and `Internal`.
-- Log internal failures with enough context for debugging, but do not expose sensitive details to clients.
-- Handle edge cases explicitly: missing resources, deleted records, unauthorized access, invalid payloads.
+### Naming Conventions
+- React component names/files: `PascalCase`.
+- Functions, variables, hooks, helpers: `camelCase`.
+- Type aliases/interfaces/Rust structs/enums: descriptive `PascalCase`.
+- Constants: uppercase only for true constants.
+- Prefer explicit domain terms over abbreviations.
 
-## Testing Guidance
-- Update or add tests alongside behavior changes when practical.
-- Prefer descriptive test names that state the business scenario.
-- Cover happy path, validation, authorization, and failure cases.
-- Keep test data minimal and intention-revealing.
-- For Rust, use `cargo test --manifest-path services/rust-doc-service/Cargo.toml` as the primary test entry point.
-- For frontend work, if automated tests are unavailable, include a short manual verification path in your final note.
-
-## Security and Config
-- Never hardcode secrets, tokens, passwords, or private keys.
-- Use environment variables for runtime configuration.
+### Error Handling and Security
+- Handle async failures where UI state must recover.
+- Use `finally` to clean loading/submitting state.
+- In Rust, map errors to clear variants (`BadRequest`, `Forbidden`, `NotFound`, `Internal`, etc.).
+- Log internal failures with context, but keep sensitive data out of logs/responses.
+- Never hardcode secrets; use environment variables.
 - Validate and sanitize user input.
-- Preserve existing auth, role, and visibility rules.
-- Avoid logging sensitive production data.
-- Do not commit local logs or temporary artifacts; logs belong under `tmp/logs/`.
 
 ## Agent Workflow
 Before editing:
 - Read nearby files and mirror local conventions.
-- Determine whether the task belongs to `apps/web`, `packages/data`, `services/rust-doc-service`, or a cross-cutting flow.
-- Check for existing docs in `docs/rust-service/` before creating new documentation.
+- Determine whether work is frontend, data, backend, or cross-cutting.
 
 During editing:
-- Keep scope tight and avoid unrelated cleanup.
-- Preserve backward compatibility unless behavior change is required.
-- Prefer updating existing docs over creating many new documents.
-- Do not introduce new tools, scripts, or architectural patterns without clear need.
+- Keep scope tight; avoid unrelated cleanup.
+- Preserve backward compatibility unless requested otherwise.
 
 Before finishing:
-- Run the relevant build, lint, and test commands.
-- Report changed files, behavioral impact, and command outcomes.
-- Call out any verification gaps, environment assumptions, or follow-up work.
+- Run relevant build/lint/test commands for touched areas.
+- Report changed files, behavior impact, and verification results.
+- Mention gaps, assumptions, or follow-up work.

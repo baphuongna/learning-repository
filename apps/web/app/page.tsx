@@ -1,12 +1,11 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { NewsList } from '@/components/news/NewsList';
 import { FeaturedNews } from '@/components/news/FeaturedNews';
 import { Button } from '@/components/ui/button';
-import { GradientText } from '@/components/ui/gradient-text';
-import { Loader2, FileText, Newspaper, BookOpen, Users } from 'lucide-react';
+import { Loader2, FileText, BookOpen, Users, Newspaper, Mail, Rss } from 'lucide-react';
 
 function NewsListFallback() {
   return (
@@ -20,16 +19,19 @@ function NewsListFallback() {
 }
 
 /**
- * Homepage - EduModern Design System
+ * Homepage - Content-First Design
  *
  * Features:
- * - Hero section with gradient background
- * - Feature highlights
- * - Featured news section
- * - Clean footer
+ * - Header with tagline
+ * - Featured news (5 items, magazine layout)
+ * - Quick links (popular docs + trending tags)
+ * - News grid with inline newsletter
+ * - Footer with features + newsletter backup
  */
 
 export default function HomePage() {
+  const [excludeIds, setExcludeIds] = useState<string[]>([]);
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
@@ -42,9 +44,14 @@ export default function HomePage() {
                 <FileText className="h-5 w-5 text-white" />
               </div>
             </div>
-            <span className="font-display font-bold text-xl text-foreground">
-              Kho Học Liệu Số
-            </span>
+            <div className="flex flex-col">
+              <span className="font-display font-bold text-xl text-foreground">
+                Kho Học Liệu Số
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Nền tảng chia sẻ kiến thức
+              </span>
+            </div>
           </Link>
 
           <nav className="flex items-center gap-6">
@@ -63,83 +70,17 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent" />
-
-        <div className="relative container mx-auto px-4 py-10 lg:py-12">
-          <div className="max-w-3xl mx-auto text-center">
-            {/* Title */}
-            <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 animate-slide-up">
-              <GradientText variant="primary">
-                Kho Học Liệu Số
-              </GradientText>
-              <br />
-              <span className="text-foreground">Cho cộng đồng học tập</span>
-            </h1>
-
-            {/* Description */}
-            <p className="text-lg md:text-xl text-muted-foreground mb-6 max-w-2xl mx-auto animate-slide-up animation-delay-100">
-              Khám phá hàng ngàn tài liệu học tập và bài viết chia sẻ kiến thức từ cộng đồng.
-            </p>
-
-            {/* CTA Button */}
-            <div className="animate-slide-up animation-delay-200">
-              <Link href="/documents">
-                <Button variant="gradient" size="lg" className="gap-2 shadow-lg shadow-primary/25">
-                  <BookOpen className="h-5 w-5" />
-                  Khám phá tài liệu
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="border-y border-border/50 bg-muted/30">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
-            {/* Feature 1 */}
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <BookOpen className="h-5 w-5 text-primary" />
-              </div>
-              <span className="font-medium text-foreground">Tài liệu đa dạng</span>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <Newspaper className="h-5 w-5 text-accent" />
-              </div>
-              <span className="font-medium text-foreground">Tin tức cập nhật</span>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
-                <Users className="h-5 w-5 text-teal-600" />
-              </div>
-              <span className="font-medium text-foreground">Cộng đồng</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Main Content */}
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8 lg:py-12">
           {/* Featured News */}
           <Suspense fallback={<NewsListFallback />}>
-            <FeaturedNews />
+            <FeaturedNews onExcludeIds={setExcludeIds} />
           </Suspense>
 
           {/* News List */}
           <Suspense fallback={<NewsListFallback />}>
-            <NewsList />
+            <NewsList excludeIds={excludeIds} />
           </Suspense>
         </div>
       </main>
@@ -147,27 +88,70 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-teal-600 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-white" />
-              </div>
+          {/* Logo + Tagline */}
+          <div className="flex items-center gap-2 mb-6">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-teal-600 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex flex-col">
               <span className="font-display font-semibold">Kho Học Liệu Số</span>
+              <span className="text-xs text-muted-foreground">Nền tảng chia sẻ kiến thức</span>
             </div>
-
-            {/* Links */}
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">Giới thiệu</a>
-              <a href="#" className="hover:text-foreground transition-colors">Điều khoản</a>
-              <a href="#" className="hover:text-foreground transition-colors">Liên hệ</a>
-            </div>
-
-            {/* Copyright */}
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Kho Học Liệu Số
-            </p>
           </div>
+          
+          {/* Features (moved from body) */}
+          <div className="flex flex-wrap items-center justify-center gap-8 py-6 border-y border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="h-5 w-5 text-primary" />
+              </div>
+              <span className="font-medium text-foreground">Tài liệu đa dạng</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                <Newspaper className="h-5 w-5 text-accent" />
+              </div>
+              <span className="font-medium text-foreground">Tin tức cập nhật</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-teal-600" />
+              </div>
+              <span className="font-medium text-foreground">Cộng đồng</span>
+            </div>
+          </div>
+
+          {/* Newsletter Backup */}
+          <div className="py-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <Mail className="h-4 w-4" />
+              Missed the newsletter?
+            </span>
+            <form className="flex gap-2">
+              <input
+                type="email"
+                placeholder="Email của bạn..."
+                className="h-9 w-48 px-3 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <Button size="sm">Đăng ký</Button>
+            </form>
+          </div>
+          
+          {/* Footer Links */}
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground py-4">
+            <a href="#" className="hover:text-foreground transition-colors">Giới thiệu</a>
+            <a href="#" className="hover:text-foreground transition-colors">Điều khoản</a>
+            <a href="#" className="hover:text-foreground transition-colors">Liên hệ</a>
+            <a href="#" className="hover:text-foreground transition-colors flex items-center gap-1">
+              <Rss className="h-3 w-3" />
+              RSS
+            </a>
+          </div>
+          
+          {/* Copyright */}
+          <p className="text-center text-sm text-muted-foreground pt-4 border-t border-border/50">
+            © {new Date().getFullYear()} Kho Học Liệu Số. Made with ❤️ for learners.
+          </p>
         </div>
       </footer>
     </div>

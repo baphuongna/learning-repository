@@ -210,6 +210,33 @@ apps/web/app/page.tsx
 // Filter toggle state
 const [filterOpen, setFilterOpen] = useState(false);
 
+// Close filter after selecting a category
+const handleCategorySelect = (categoryId: string | null) => {
+  setSelectedCategory(categoryId);
+  setFilterOpen(false);
+};
+
+// Close filter when clicking outside
+const useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (filterOpen && filterRef.current && !filterRef.current.contains(event.target as Node)) {
+      setFilterOpen(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [filterOpen]);
+```
+
+**Toggle Mechanism:**
+```tsx
+// Filter toggle state
+const [filterOpen, setFilterOpen] = useState(false);
+
 // Close filter when clicking outside
 useEffect(() => {
   const handleClickOutside = (e: MouseEvent) => {

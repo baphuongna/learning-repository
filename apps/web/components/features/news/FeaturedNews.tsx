@@ -7,17 +7,21 @@ import { SkeletonNewsCard } from '@/components/ui/skeleton';
 import { Flame, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+interface FeaturedNewsProps {
+  onExcludeIds?: (ids: string[]) => void;
+}
+
 /**
  * FeaturedNews Component - EduModern Design System
  *
  * Features:
- * - Hero section with featured news
- * - Magazine-style layout
+ * - 5 featured news items
+ * - Magazine layout: 1 hero + 4 medium cards
  * - Staggered animation on load
- * - Responsive grid
+ * - Returns excludeIds for parent component
  */
 
-export function FeaturedNews() {
+export function FeaturedNews({ onExcludeIds }: FeaturedNewsProps) {
   const [featured, setFeatured] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,8 +32,13 @@ export function FeaturedNews() {
   const fetchFeatured = async () => {
     try {
       setLoading(true);
-      const data = await newsApi.getFeatured(3);
+      const data = await newsApi.getFeatured(5);
       setFeatured(data);
+      
+      // Pass excludeIds to parent for NewsList filtering
+      if (onExcludeIds && data.length > 0) {
+        onExcludeIds(data.map((news) => news.id));
+      }
     } catch (err) {
       console.error('Failed to fetch featured news:', err);
     } finally {
@@ -44,10 +53,17 @@ export function FeaturedNews() {
         <div className="flex items-center gap-2 mb-6">
           <div className="h-8 w-40 bg-muted rounded animate-pulse" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <SkeletonNewsCard key={i} variant="featured" />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Hero skeleton */}
+          <div className="lg:col-span-2">
+            <SkeletonNewsCard variant="featured" />
+          </div>
+          {/* Medium cards skeleton */}
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-20 bg-muted rounded animate-pulse" />
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -76,34 +92,26 @@ export function FeaturedNews() {
         </Link>
       </div>
 
-      {/* Featured Grid */}
-      {featured.length === 3 ? (
-        // Magazine layout: 1 large + 2 smaller
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Main featured */}
-          <div className="lg:row-span-2">
-            <NewsCard news={featured[0]} variant="featured" />
-          </div>
-          {/* Secondary featured */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6">
-            <NewsCard news={featured[1]} variant="featured" />
-            <NewsCard news={featured[2]} variant="featured" />
-          </div>
+      {/* Magazine Layout: Hero (2/3) + Medium Cards (1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Hero Card - Takes 2/3 width */}
+        <div className="lg:col-span-2">
+          <NewsCard news={featured[0]} variant="hero" />
         </div>
-      ) : (
-        // Fallback grid for any number
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featured.map((news, index) => (
+        
+        {/* Medium Cards - Takes 1/3 width, stacked vertically */}
+        <div className="space-y-4">
+          {featured.slice(1, 5).map((news, index) => (
             <div
               key={news.id}
               className="animate-slide-up"
-              style={{ animationDelay: `${index * 100}ms` }}
+              style={{ animationDelay: `${(index + 1) * 100}ms` }}
             >
-              <NewsCard news={news} variant="featured" />
+              <NewsCard news={news} variant="medium" />
             </div>
           ))}
         </div>
-      )}
+      </div>
     </section>
   );
 }

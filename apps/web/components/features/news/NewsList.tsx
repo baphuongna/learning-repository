@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NewsCard } from './NewsCard';
 import { News, NewsCategory, newsApi, categoriesApi } from '@/lib/api';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SkeletonNewsCard } from '@/components/ui/skeleton';
 import { EmptyNews } from '@/components/ui/empty-state';
+import { NewsletterBanner } from '@/components/news/NewsletterBanner';
 import { Search, RefreshCw, ChevronLeft, ChevronRight, LayoutGrid, List, SlidersHorizontal } from 'lucide-react';
 
 /**
@@ -21,13 +22,16 @@ import { Search, RefreshCw, ChevronLeft, ChevronRight, LayoutGrid, List, Sliders
  * - Grid/List view toggle
  * - Smooth loading skeletons
  * - Pagination with ellipsis
+ * - excludeIds for filtering featured news
+ * - Newsletter banner integration
  */
 
 interface NewsListProps {
   initialCategory?: string;
+  excludeIds?: string[];
 }
 
-export function NewsList({ initialCategory }: NewsListProps) {
+export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
   const router = useRouter();
 
   const [news, setNews] = useState<News[]>([]);
@@ -80,6 +84,12 @@ export function NewsList({ initialCategory }: NewsListProps) {
   useEffect(() => {
     void fetchNews(meta.page);
   }, [fetchNews, meta.page]);
+
+  // Client-side filtering based on excludeIds
+  const filteredNews = useMemo(() => {
+    if (!excludeIds || excludeIds.length === 0) return news;
+    return news.filter((item) => !excludeIds.includes(item.id));
+  }, [news, excludeIds]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +146,10 @@ export function NewsList({ initialCategory }: NewsListProps) {
       </div>
     );
   }
+
+  // Split news for newsletter insertion (after 6 cards)
+  const firstSix = filteredNews.slice(0, 6);
+  const rest = filteredNews.slice(6);
 
   return (
     <div className="space-y-8">
@@ -206,20 +220,20 @@ export function NewsList({ initialCategory }: NewsListProps) {
       </div>
 
       {/* Results count */}
-      {meta.total > 0 && (
+      {filteredNews.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <SlidersHorizontal className="h-4 w-4" />
           <span>
-            Tìm thấy <strong className="text-foreground">{meta.total}</strong> bài viết
+            Hiển thị <strong className="text-foreground">{filteredNews.length}</strong> bài viết
           </span>
         </div>
       )}
 
-      {/* News Grid/List */}
-      {news.length > 0 ? (
+      {/* News Grid/List with Newsletter */}
+      {filteredNews.length > 0 ? (
         viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {news.map((item, index) => (
+            {firstSix.map((item, index) => (
               <div
                 key={item.id}
                 className="animate-slide-up"
@@ -228,10 +242,21 @@ export function NewsList({ initialCategory }: NewsListProps) {
                 <NewsCard news={item} />
               </div>
             ))}
+            {/* Newsletter Banner after 6 cards */}
+            <NewsletterBanner className="col-span-full" />
+            {rest.map((item, index) => (
+              <div
+                key={item.id}
+                className="animate-slide-up"
+                style={{ animationDelay: `${(index + 6) * 50}ms` }}
+              >
+                <NewsCard news={item} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="space-y-4">
-            {news.map((item, index) => (
+            {filteredNews.map((item, index) => (
               <div
                 key={item.id}
                 className="animate-slide-up"
