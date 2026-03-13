@@ -94,13 +94,18 @@ apps/web/app/page.tsx
 **Changes:**
 - Add tagline "Nền tảng chia sẻ kiến thức" below logo
 - Logo container changes from single line to flex-col
-- Header height may need slight adjustment (h-16 → h-auto py-2 if needed)
+- Header height: Keep `h-16` if single-line fits, adjust to `h-auto py-3` if tagline causes overflow
+- Criteria: Header should not exceed 72px total height
 
 ---
 
 ### 2. Sticky Search Bar
 
-**Location:** `apps/web/components/news/StickySearchBar.tsx` (NEW)
+**Location:** `apps/web/components/home/StickySearchBar.tsx` (NEW)
+
+**Dependencies:**
+- `CategoryChips`: Extract from existing NewsList.tsx (lines 188-206), renders category badges as filter chips
+- `ViewModeToggle`: New inline component - two buttons (grid/list icons) with active state styling
 
 **Design:**
 ```tsx
@@ -134,6 +139,63 @@ apps/web/app/page.tsx
       <CategoryChips selected={category} onSelect={setCategory} />
     </div>
   )}
+</div>
+```
+
+**Component Definitions:**
+
+**CategoryChips:**
+```tsx
+// Reuse existing category filter logic from NewsList.tsx
+// Located at: apps/web/components/news/CategoryChips.tsx (NEW - extract from NewsList)
+<div className="flex flex-wrap gap-2">
+  <Badge
+    variant={selected === null ? 'default' : 'outline'}
+    className="cursor-pointer"
+    onClick={() => onSelect(null)}
+  >
+    Tất cả
+  </Badge>
+  {categories.map((category) => (
+    <Badge
+      key={category.id}
+      variant={selected === category.id ? 'default' : 'outline'}
+      className="cursor-pointer"
+      onClick={() => onSelect(category.id)}
+    >
+      {category.name}
+    </Badge>
+  ))}
+</div>
+```
+
+**ViewModeToggle:**
+```tsx
+// New inline component - two buttons (grid/list icons) with active state
+// Located at: apps/web/components/news/ViewModeToggle.tsx (NEW)
+<div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+  <button
+    onClick={() => onChange('grid')}
+    className={`p-2 rounded-md transition-colors ${
+      mode === 'grid'
+        ? 'bg-background text-primary shadow-sm'
+        : 'text-muted-foreground hover:text-foreground'
+    }`}
+    aria-label="Grid view"
+  >
+    <LayoutGrid className="h-4 w-4" />
+  </button>
+  <button
+    onClick={() => onChange('list')}
+    className={`p-2 rounded-md transition-colors ${
+      mode === 'list'
+        ? 'bg-background text-primary shadow-sm'
+        : 'text-muted-foreground hover:text-foreground'
+    }`}
+    aria-label="List view"
+  >
+    <List className="h-4 w-4" />
+  </button>
 </div>
 ```
 
@@ -191,18 +253,22 @@ apps/web/app/page.tsx
 ```
 
 **Hero Card Variant (NEW):**
-- Image height: ~480px
+- Image height: 480px (fixed on desktop, min-h-64 on mobile)
 - Full-width gradient overlay
 - Category badge (top-left, accent color)
 - Title: text-2xl/3xl, white, line-clamp-2
 - Summary: text-sm, white/80, line-clamp-1
 - Meta: author avatar + name + date
+- Responsive: `h-[280px] md:h-[400px] lg:h-[480px]`
 
 **Medium Card Variant (NEW):**
 - Horizontal layout
-- Thumbnail: 120x80px, rounded
+- Thumbnail: 
+  - Desktop: 120x80px fixed (w-[120px] h-[80px])
+  - Mobile: 96x64px (w-24 h-16)
+  - Object-fit: cover, rounded-lg
 - Content: category badge (sm), title (1 line), author + relative time
-- Hover: subtle background change
+- Hover: subtle background change (hover:bg-muted/50)
 
 ---
 
@@ -268,7 +334,32 @@ apps/web/app/page.tsx
 
 **Data Sources:**
 - Popular docs: `GET /documents?sortBy=downloadCount&limit=4`
-- Trending tags: Aggregate from news + documents keywords
+- Trending tags: Use mock data initially, later can implement `GET /tags/trending?limit=10`
+
+**Tag Data Structure:**
+```typescript
+interface TrendingTag {
+  id: string;
+  name: string;
+  count: number;  // Number of posts with this tag
+  weight: number; // 0-1 normalized value for font sizing (0 = smallest, 1 = largest)
+}
+```
+
+**MVP Approach:** Use mock data for quick links initially:
+```typescript
+// Mock data for trending tags (until API is ready)
+const mockTrendingTags: TrendingTag[] = [
+  { id: '1', name: 'React', count: 45, weight: 1.0 },
+  { id: '2', name: 'NextJS', count: 38, weight: 0.85 },
+  { id: '3', name: 'TypeScript', count: 32, weight: 0.7 },
+  { id: '4', name: 'Rust', count: 28, weight: 0.6 },
+  { id: '5', name: 'Prisma', count: 24, weight: 0.5 },
+  { id: '6', name: 'Database', count: 20, weight: 0.4 },
+  { id: '7', name: 'WebDev', count: 18, weight: 0.35 },
+  { id: '8', name: 'Tutorial', count: 15, weight: 0.3 },
+];
+```
 
 ---
 
@@ -279,7 +370,7 @@ apps/web/app/page.tsx
 **Changes:**
 - Add section header with icon + count
 - Accept `excludeIds` prop to exclude featured news
-- Newsletter banner inline after row 2-3
+- Newsletter banner inline after row 2
 
 **Implementation:**
 ```tsx
@@ -312,14 +403,30 @@ const response = await newsApi.getAll({
 ```
 
 **Newsletter Inline Placement:**
+- Position: After the 6th news card (end of row 2 in 3-column grid)
+- Implementation approach: Render as a separate element, not inside the map loop
+- Use CSS Grid `col-span-full` to span full width
+
 ```tsx
-// After row 2 (index 5 or 6)
-{news.map((item, index) => (
-  <Fragment key={item.id}>
-    <NewsCard news={item} />
-    {index === 5 && <NewsletterBanner />}
-  </Fragment>
-))}
+// CORRECT approach - render newsletter outside the map
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {/* First row (6 cards) */}
+  {news.slice(0, 6).map((item, index) => (
+    <div key={item.id} className="animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+      <NewsCard news={item} />
+    </div>
+  ))}
+  
+  {/* Newsletter banner - spans full width after row 2 */}
+  <NewsletterBanner className="col-span-full" />
+  
+  {/* Remaining cards */}
+  {news.slice(6).map((item, index) => (
+    <div key={item.id} className="animate-slide-up" style={{ animationDelay: `${(index + 6) * 50}ms` }}>
+      <NewsCard news={item} />
+    </div>
+  ))}
+</div>
 ```
 
 ---
@@ -470,6 +577,8 @@ QuickLinks component
 | `apps/web/components/home/StickySearchBar.tsx` | Sticky search with collapsible filters |
 | `apps/web/components/home/QuickLinks.tsx` | Popular docs + trending tags |
 | `apps/web/components/news/NewsletterBanner.tsx` | Inline newsletter signup |
+| `apps/web/components/news/CategoryChips.tsx` | Extract category filter from NewsList |
+| `apps/web/components/news/ViewModeToggle.tsx` | Grid/list view toggle |
 
 ---
 
@@ -484,7 +593,7 @@ QuickLinks component
 - `GET /tags/trending` - trending tags aggregation
 - `POST /newsletter/subscribe` - newsletter subscription
 
-**MVP Approach:** Mock data for quick links if APIs not ready
+**MVP Approach:** Use mock data for quick links if APIs not ready
 
 ---
 
