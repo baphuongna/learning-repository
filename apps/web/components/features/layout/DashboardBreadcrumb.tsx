@@ -25,7 +25,7 @@ export function DashboardBreadcrumb() {
   const pathname = usePathname();
   const segments = pathname.split('/').filter(Boolean);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 || pathname === '/dashboard') {
     return null;
   }
 
@@ -42,27 +42,30 @@ export function DashboardBreadcrumb() {
   });
 
   return (
-    <nav aria-label="Dashboard breadcrumb" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+    <nav
+      aria-label="Dashboard breadcrumb"
+      className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground md:text-sm"
+    >
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
       >
-        <Home className="h-4 w-4" />
+        <Home className="h-3.5 w-3.5" />
         <span>Dashboard</span>
       </Link>
 
       {items.map((item) => (
-        <div key={item.href} className="inline-flex items-center gap-2">
-          <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
+        <div key={item.href} className="inline-flex items-center gap-1.5">
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
           {item.isLast ? (
-            <span className="rounded-lg bg-primary/10 px-2 py-1 font-medium text-primary">
+            <span className="rounded-md bg-primary/10 px-1.5 py-1 font-medium text-primary">
               {item.label}
             </span>
           ) : (
             <Link
               href={item.href}
               className={cn(
-                'rounded-lg px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
+                'rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
               )}
             >
               {item.label}
