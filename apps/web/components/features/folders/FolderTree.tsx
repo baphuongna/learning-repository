@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Folder, foldersApi } from '@/lib/api';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, Loader2, FolderOpen } from 'lucide-react';
+import { ChevronRight, Folder as FolderIcon, Loader2, FolderOpen, FolderTree as FolderTreeIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FolderActions } from './FolderActions';
 
@@ -10,6 +10,10 @@ interface FolderTreeProps {
   currentFolderId: string | null;
   onSelectFolder: (folderId: string | null) => void;
 }
+
+// Hằng số cho indent - tăng lên 16px để rõ ràng hơn
+const INDENT_SIZE = 16;
+const BASE_PADDING = 8;
 
 export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps) {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -32,6 +36,25 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
   useEffect(() => {
     loadFolders();
   }, [loadFolders]);
+
+  // Tự động expand các folder cha khi chọn folder con
+  useEffect(() => {
+    if (currentFolderId) {
+      const expandParents = async () => {
+        try {
+          const breadcrumbs = await foldersApi.getBreadcrumbs(currentFolderId);
+          setExpandedIds((prev) => {
+            const newSet = new Set(prev);
+            breadcrumbs.forEach((folder) => newSet.add(folder.id));
+            return newSet;
+          });
+        } catch (error) {
+          console.error('Failed to expand parents:', error);
+        }
+      };
+      void expandParents();
+    }
+  }, [currentFolderId]);
 
   const toggleExpand = useCallback((folderId: string) => {
     setExpandedIds((prev) => {
@@ -61,34 +84,52 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
     const isSelected = currentFolderId === folder.id;
     const childFolders = getChildFolders(folder.id);
     const hasChildren = childFolders.length > 0;
+    const paddingLeft = depth * INDENT_SIZE + BASE_PADDING;
 
     return (
       <div key={folder.id}>
         <div
           className={cn(
-            'group flex items-center gap-1 py-1.5 px-2 rounded-md cursor-pointer hover:bg-accent',
-            isSelected && 'bg-accent text-accent-foreground',
+            // Base styles
+            'group relative flex items-center gap-1 py-2 px-2 rounded-md cursor-pointer',
+            'transition-all duration-150 ease-in-out',
+            // Hover state - subtle
+            'hover:bg-muted/60',
+            // Active/selected state - prominent
+            isSelected && [
+              'bg-primary/10',
+              'hover:bg-primary/15',
+              'font-medium',
+            ],
           )}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          style={{ paddingLeft: `${paddingLeft}px` }}
         >
-          {/* Expand/collapse button */}
-          {hasChildren ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleExpand(folder.id);
-              }}
-              className="p-0.5 hover:bg-muted rounded"
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              )}
-            </button>
-          ) : (
-            <span className="w-4" />
+          {/* Left border indicator cho folder đang chọn */}
+          {isSelected && (
+            <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-primary rounded-full" />
           )}
+
+          {/* Expand/collapse button - cải thiện affordance */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpand(folder.id);
+            }}
+            className={cn(
+              'flex items-center justify-center',
+              'w-5 h-5 rounded transition-all duration-150',
+              'hover:bg-muted',
+              hasChildren ? 'visible' : 'invisible'
+            )}
+            aria-label={isExpanded ? 'Thu gọn thư mục' : 'Mở rộng thư mục'}
+          >
+            <ChevronRight
+              className={cn(
+                'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                isExpanded && 'rotate-90'
+              )}
+            />
+          </button>
 
           {/* Folder icon and name */}
           <div
@@ -97,13 +138,24 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
           >
             <FolderIcon
               className={cn(
-                'h-4 w-4 flex-shrink-0',
-                isSelected ? 'text-primary' : 'text-yellow-500'
+                'h-4 w-4 flex-shrink-0 transition-colors',
+                isSelected ? 'text-primary' : 'text-amber-500'
               )}
+              strokeWidth={1.5}
             />
-            <span className="truncate text-sm">{folder.name}</span>
+            <span className={cn(
+              'truncate text-sm transition-colors',
+              isSelected ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
+            )}>
+              {folder.name}
+            </span>
+            {/* Document count badge */}
             {folder._count && folder._count.documents > 0 && (
-              <span className="text-xs text-muted-foreground ml-auto">
+              <span className={cn(
+                'text-xs px-1.5 py-0.5 rounded-full ml-auto',
+                'bg-muted text-muted-foreground',
+                isSelected && 'bg-primary/20 text-primary'
+              )}>
                 {folder._count.documents}
               </span>
             )}
@@ -117,9 +169,12 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
           />
         </div>
 
-        {/* Child folders */}
+        {/* Child folders với connecting line indicator */}
         {isExpanded && hasChildren && (
-          <div>
+          <div
+            className="relative ml-4 border-l border-border/40"
+            style={{ marginLeft: `${paddingLeft + 8}px` }}
+          >
             {childFolders.map((child) => renderFolderItem(child, depth + 1))}
           </div>
         )}
@@ -148,22 +203,48 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
   }
 
   return (
-    <div className="space-y-0.5">
-      {/* All documents option */}
-      <div
+    <div className="space-y-1">
+      {/* All documents option - nổi bật hơn */}
+      <button
+        type="button"
         className={cn(
-          'flex items-center gap-2 py-1.5 px-2 rounded-md cursor-pointer hover:bg-accent',
-          currentFolderId === null && 'bg-accent text-accent-foreground'
+          'w-full flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer',
+          'transition-all duration-150 ease-in-out',
+          'hover:bg-muted/60',
+          currentFolderId === null && [
+            'bg-primary/10',
+            'hover:bg-primary/15',
+            'font-medium',
+          ]
         )}
         onClick={() => onSelectFolder(null)}
       >
-        <FolderOpen className="h-4 w-4" />
-        <span className="text-sm">Tất cả tài liệu</span>
-      </div>
+        <FolderOpen
+          className={cn(
+            'h-4 w-4 flex-shrink-0',
+            currentFolderId === null ? 'text-primary' : 'text-muted-foreground'
+          )}
+        />
+        <span className={cn(
+          'text-sm',
+          currentFolderId === null ? 'text-foreground' : 'text-muted-foreground'
+        )}>
+          Tất cả tài liệu
+        </span>
+      </button>
 
-      {/* Folder tree */}
-      <div className="border-t pt-2 mt-2">
-        {rootFolders.map((folder) => renderFolderItem(folder))}
+      {/* Folder tree section */}
+      <div className="pt-2 mt-2 border-t">
+        {/* Section header */}
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <FolderTreeIcon className="h-3 w-3" />
+          <span>Thư mục</span>
+        </div>
+
+        {/* Folder items */}
+        <div className="mt-1">
+          {rootFolders.map((folder) => renderFolderItem(folder))}
+        </div>
       </div>
     </div>
   );

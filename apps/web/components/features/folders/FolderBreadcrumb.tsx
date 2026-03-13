@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { Folder as FolderType, foldersApi } from '@/lib/api';
-import { ChevronRight, Home, Loader2, Folder as FolderIcon, FileText } from 'lucide-react';
+import { ChevronRight, Home, Loader2, Folder as FolderIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
  * FolderBreadcrumb Component - EduModern Design System
  *
  * Features:
- * - Clean breadcrumb navigation
+ * - Clean breadcrumb navigation for folder hierarchy
  * - Home icon for root
- * - Clickable path items
- * - Current item highlighted
+ * - Clickable path items with smooth transitions
+ * - Current item highlighted prominently
+ * - Compact design that integrates well with ContextBar
  */
 
 interface FolderBreadcrumbProps {
@@ -47,28 +48,46 @@ export function FolderBreadcrumb({ currentFolderId, onNavigate, className }: Fol
     loadBreadcrumbs();
   }, [currentFolderId]);
 
+  // Loading state - compact
   if (loading) {
     return (
       <div className={cn('flex items-center gap-2 text-sm', className)}>
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        <span className="text-muted-foreground">Đang tải...</span>
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        <span className="text-muted-foreground text-xs">Đang tải...</span>
       </div>
     );
   }
 
   return (
-    <nav className={cn('flex items-center gap-0.5 text-sm flex-wrap', className)} aria-label="Breadcrumb">
-      {/* Root folder link */}
+    <nav
+      className={cn('flex items-center gap-1 text-sm flex-wrap', className)}
+      aria-label="Điều hướng thư mục"
+    >
+      {/* Root folder link - Home icon only when in subfolder, full label at root */}
       <button
+        type="button"
         onClick={() => onNavigate(null)}
         className={cn(
-          'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors',
+          'flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-150',
           'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-          !currentFolderId && 'text-foreground bg-muted/50 font-medium'
+          !currentFolderId && [
+            'text-foreground bg-primary/10',
+            'hover:bg-primary/15',
+            'font-medium',
+          ]
         )}
+        title="Về thư mục gốc"
       >
-        <Home className="h-4 w-4" />
-        <span>Tài liệu</span>
+        <Home
+          className={cn(
+            'h-3.5 w-3.5 transition-colors',
+            !currentFolderId ? 'text-primary' : 'text-muted-foreground'
+          )}
+        />
+        {/* Chỉ hiện chữ "Tài liệu" khi đang ở root */}
+        {!currentFolderId && (
+          <span className="hidden sm:inline">Tài liệu</span>
+        )}
       </button>
 
       {/* Breadcrumb items */}
@@ -76,30 +95,40 @@ export function FolderBreadcrumb({ currentFolderId, onNavigate, className }: Fol
         const isLast = index === breadcrumbs.length - 1;
 
         return (
-          <div key={folder.id} className="flex items-center gap-0.5">
-            {/* Separator */}
-            <ChevronRight className="h-4 w-4 text-muted-foreground/50 mx-1" />
+          <div key={folder.id} className="flex items-center gap-1">
+            {/* Separator - subtle chevron */}
+            <ChevronRight
+              className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0"
+              aria-hidden="true"
+            />
 
             {/* Folder link */}
             <button
+              type="button"
               onClick={() => onNavigate(folder.id)}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors',
+                'flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-150',
+                'max-w-[180px]', // Giới hạn width để tránh overflow
                 isLast
-                  ? 'text-foreground bg-primary/10 font-medium hover:bg-primary/15'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  ? [
+                      'text-foreground bg-primary/10 font-medium',
+                      'hover:bg-primary/15',
+                    ]
+                  : [
+                      'text-muted-foreground',
+                      'hover:text-foreground hover:bg-muted/50',
+                    ]
               )}
+              title={folder.name}
             >
               <FolderIcon
                 className={cn(
-                  'h-4 w-4',
+                  'h-3.5 w-3.5 flex-shrink-0 transition-colors',
                   isLast ? 'text-primary' : 'text-amber-500'
                 )}
                 strokeWidth={1.5}
-                fill="currentColor"
-                fillOpacity={0.15}
               />
-              <span className="max-w-[150px] truncate">{folder.name}</span>
+              <span className="truncate text-sm">{folder.name}</span>
             </button>
           </div>
         );
