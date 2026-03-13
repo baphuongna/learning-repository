@@ -5,9 +5,49 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Lock, ArrowLeft, CheckCircle } from 'lucide-react';
+import { PageHeader } from '@/components/features/layout/PageHeader';
+import {
+  AccountPageLayout,
+  AccountSection,
+  AccountAlert,
+  FormFieldGroup,
+} from '@/components/account/AccountSections';
+import { Loader2, Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+
+/* ============================================
+   Types
+   ============================================ */
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+};
+
+function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    ('response' in error || 'message' in error)
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isApiError(error)) {
+    return error.response?.data?.message || error.message || 'Đã xảy ra lỗi không xác định';
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Đã xảy ra lỗi không xác định';
+}
+
+/* ============================================
+   Change Password Page Component
+   ============================================ */
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -66,110 +106,161 @@ export default function ChangePasswordPage() {
       setTimeout(() => {
         router.push('/profile');
       }, 2000);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to change password:', err);
-      setError(err.response?.data?.message || 'Không thể đổi mật khẩu');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
+  const dismissAlert = () => {
+    setError(null);
+  };
+
   return (
-    <div className="max-w-md mx-auto space-y-6">
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Quay lại
-        </Button>
-        <h1 className="text-3xl font-bold">Đổi mật khẩu</h1>
-        <p className="text-muted-foreground">Cập nhật mật khẩu tài khoản của bạn</p>
-      </div>
+    <AccountPageLayout>
+      {/* Page Header */}
+      <PageHeader
+        title="Đổi mật khẩu"
+        description="Cập nhật mật khẩu để bảo vệ tài khoản của bạn"
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại
+          </Button>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
-            Đổi mật khẩu
-          </CardTitle>
-          <CardDescription>
-            Nhập mật khẩu hiện tại và mật khẩu mới
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {success ? (
-            <div className="text-center py-8">
-              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Đổi mật khẩu thành công!</h3>
-              <p className="text-muted-foreground">
-                Đang chuyển về trang thông tin cá nhân...
-              </p>
+      {/* Change Password Section */}
+      <AccountSection
+        title="Bảo mật tài khoản"
+        description="Nhập mật khẩu hiện tại và mật khẩu mới của bạn"
+        icon={<Lock className="h-5 w-5" />}
+      >
+        {success ? (
+          /* Success State */
+          <div className="py-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error */}
-              {error && (
-                <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Current Password */}
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Mật khẩu hiện tại</Label>
-                <Input
-                  id="currentPassword"
-                  type="password"
-                  value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                  placeholder="••••••••"
-                />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
+              Đổi mật khẩu thành công!
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Đang chuyển về trang thông tin cá nhân...
+            </p>
+            <div className="mt-4">
+              <div className="mx-auto h-1.5 w-48 overflow-hidden rounded-full bg-muted">
+                <div className="h-full animate-[shrink_2s_linear_forwards] rounded-full bg-green-500" />
               </div>
+            </div>
+          </div>
+        ) : (
+          /* Form */
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Error Alert */}
+            {error && (
+              <AccountAlert variant="error" onDismiss={dismissAlert}>
+                {error}
+              </AccountAlert>
+            )}
 
-              {/* New Password */}
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">Mật khẩu mới</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={formData.newPassword}
-                  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                  placeholder="••••••••"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Tối thiểu 6 ký tự
-                </p>
-              </div>
+            {/* Current Password Field */}
+            <FormFieldGroup
+              label="Mật khẩu hiện tại"
+              id="currentPassword"
+            >
+              <Input
+                id="currentPassword"
+                type="password"
+                value={formData.currentPassword}
+                onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </FormFieldGroup>
 
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  placeholder="••••••••"
-                />
-              </div>
+            {/* New Password Field */}
+            <FormFieldGroup
+              label="Mật khẩu mới"
+              id="newPassword"
+              helperText="Tối thiểu 6 ký tự"
+            >
+              <Input
+                id="newPassword"
+                type="password"
+                value={formData.newPassword}
+                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </FormFieldGroup>
 
-              {/* Submit */}
-              <Button type="submit" className="w-full" disabled={loading}>
+            {/* Confirm Password Field */}
+            <FormFieldGroup
+              label="Xác nhận mật khẩu mới"
+              id="confirmPassword"
+            >
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </FormFieldGroup>
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <Button type="submit" variant="gradient" className="w-full sm:w-auto" disabled={loading}>
                 {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Đang xử lý...
+                  </>
                 ) : (
-                  <Lock className="h-4 w-4 mr-2" />
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Đổi mật khẩu
+                  </>
                 )}
-                {loading ? 'Đang xử lý...' : 'Đổi mật khẩu'}
               </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            </div>
+          </form>
+        )}
+      </AccountSection>
+
+      {/* Security Tips */}
+      <AccountSection
+        title="Mẹo bảo mật"
+        description="Giữ tài khoản của bạn an toàn"
+        variant="outline"
+      >
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+            <span>Sử dụng mật khẩu có ít nhất 6 ký tự</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+            <span>Kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+            <span>Không sử dụng mật khẩu giống với các tài khoản khác</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+            <span>Thay đổi mật khẩu định kỳ để tăng cường bảo mật</span>
+          </li>
+        </ul>
+      </AccountSection>
+    </AccountPageLayout>
   );
 }

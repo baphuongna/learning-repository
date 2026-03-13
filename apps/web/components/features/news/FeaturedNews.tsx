@@ -26,7 +26,8 @@ export function FeaturedNews({ onExcludeIds }: FeaturedNewsProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFeatured();
+    void fetchFeatured();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchFeatured = async () => {
