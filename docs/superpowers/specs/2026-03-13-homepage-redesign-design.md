@@ -205,6 +205,34 @@ apps/web/app/page.tsx
 - Click outside hoặc select category để collapse
 - Badge hiển thị số filters active
 
+**Toggle Mechanism:**
+```tsx
+// Filter toggle state
+const [filterOpen, setFilterOpen] = useState(false);
+
+// Close filter when clicking outside
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    const target = document.getElementById('filter-panel');
+    if (filterOpen && target && !target.contains(e.target as Node)) {
+      setFilterOpen(false);
+    }
+  };
+  
+  if (filterOpen) {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }
+}, [filterOpen]);
+
+// Close filter after selecting a category
+const handleCategorySelect = (categoryId: string | null) => {
+  setSelectedCategory(categoryId);
+  setFilterOpen(false);
+  setMeta(prev => ({ ...prev, page: 1 }));
+};
+```
+
 ---
 
 ### 3. Featured News (5 tin)
@@ -379,14 +407,33 @@ interface NewsListProps {
   excludeIds?: string[]; // NEW
 }
 
-// In fetchNews:
-const response = await newsApi.getAll({
-  page,
-  limit: meta.limit,
-  category: selectedCategory || undefined,
-  search: searchQuery || undefined,
-  excludeIds: excludeIds, // NEW
-});
+// Frontend workaround for excludeIds (backend API doesn't support it yet)
+// Filter in client after fetching
+const fetchNews = useCallback(async (page = 1) => {
+  try {
+    setLoading(true);
+    setError(null);
+    const response = await newsApi.getAll({
+      page,
+      limit: meta.limit,
+      category: selectedCategory || undefined,
+      search: searchQuery || undefined,
+    });
+    
+    // Client-side filtering for excludeIds
+    const filteredData = excludeIds 
+      ? response.data.filter(item => !excludeIds.includes(item.id))
+      : response.data;
+    
+    setNews(filteredData);
+    setMeta(response.meta);
+  } catch (err: any) {
+    console.error('Failed to fetch news:', err);
+    setError(err.response?.data?.message || 'Không thể tải tin tức');
+  } finally {
+    setLoading(false);
+  }
+}, [meta.limit, searchQuery, selectedCategory, excludeIds]);
 ```
 
 **Section Header:**
@@ -479,6 +526,68 @@ const response = await newsApi.getAll({
 - Submit: API call (endpoint TBD, mock for MVP)
 - Success: Toast notification
 - Error: Inline error message
+
+**Newsletter API Specification:**
+```typescript
+// MVP: Mock implementation (no backend yet)
+// File: apps/web/lib/api/newsletter.ts
+
+interface NewsletterSubscribeResponse {
+  success: boolean;
+  message: string;
+}
+
+export const newsletterApi = {
+  subscribe: async (email: string): Promise<NewsletterSubscribeResponse> => {
+    // MVP: Simulate API call with 500ms delay
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          reject(new Error('Email không hợp lệ'));
+          return;
+        }
+        
+        // Simulate success (in production, this would call POST /api/newsletter/subscribe)
+        console.log('[MVP] Newsletter subscription:', email);
+        resolve({ success: true, message: 'Đăng ký thành công!' });
+      }, 500);
+    });
+  },
+};
+```
+
+**Error/Success UI Patterns:**
+```tsx
+const [email, setEmail] = useState('');
+const [error, setError] = useState<string | null>(null);
+const [success, setSuccess] = useState(false);
+const [submitting, setSubmitting] = useState(false);
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!email.trim()) {
+    setError('Vui lòng nhập email');
+    return;
+  }
+  
+  try {
+    setSubmitting(true);
+    setError(null);
+    await newsletterApi.subscribe(email);
+    setSuccess(true);
+    setEmail('');
+    // Optional: Show toast notification
+    // toast.success('Đăng ký thành công! Kiểm tra email để xác nhận.');
+  } catch (err: any) {
+    setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+  } finally {
+    setSubmitting(false);
+  }
+};
+```
 
 ---
 
@@ -594,6 +703,85 @@ QuickLinks component
 - `POST /newsletter/subscribe` - newsletter subscription
 
 **MVP Approach:** Use mock data for quick links if APIs not ready
+
+---
+
+## Animation & Transition Specs
+
+### Animation Classes (globals.css)
+```css
+/* Slide up animation */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+```
+
+### Keyframe Timing
+| Animation | Duration | Delay Pattern |
+|-----------|----------|---------------|
+| `slide-up` | 300ms | Staggered: `${index * 50}ms` per card |
+
+### When to Apply
+- News cards entering viewport: `animate-slide-up`
+- Featured news cards: `animate-slide-up` with staggered delays
+- Newsletter banner: No animation (static position)
+
+---
+
+## Error & Success UI Patterns
+
+### Error Display Pattern
+```tsx
+// Inline error message below input
+{error && (
+  <p className="text-sm text-destructive flex items-center gap-1 mt-2">
+    <AlertCircle className="h-4 w-4" />
+    {error}
+  </p>
+)}
+```
+
+### Success Display Pattern
+```tsx
+// Toast notification (using sonner or similar)
+import { toast } from 'sonner';
+
+// On success
+toast.success('Thao tác thành công!', {
+  description: 'Chi tiết bổ sung...',
+  action: {
+    label: 'Xem',
+    onClick: () => router.push('/path')
+  }
+});
+```
+
+### Loading States
+```tsx
+// Skeleton loading for cards
+<div className="space-y-3">
+  <Skeleton className="h-48 w-full rounded-lg" />
+  <Skeleton className="h-4 w-3/4" />
+  <Skeleton className="h-4 w-1/2" />
+</div>
+
+// Spinner for buttons
+<Button disabled={submitting}>
+  {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+  Đang xử lý...
+</Button>
+```
 
 ---
 
