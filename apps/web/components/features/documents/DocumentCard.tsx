@@ -13,8 +13,8 @@ import { cn } from '@/lib/utils';
  * Features:
  * - Refined card design with warm shadows
  * - File type icon with color coding
- * - Keyword tags
- * - Quick action buttons on hover
+ * - Keyword tags (normalized for display)
+ * - Quick action buttons always visible
  */
 
 interface DocumentCardProps {
@@ -22,7 +22,51 @@ interface DocumentCardProps {
   variant?: 'default' | 'compact';
 }
 
+const isDisplayableKeyword = (value: string) => {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return !['[]', '[', ']', '"', "'"] .includes(normalized);
+};
+
+// Normalize keywords - xử lý malformed data từ API/DB
+const normalizeKeywords = (keywords: unknown): string[] => {
+  if (!keywords) return [];
+
+  if (Array.isArray(keywords)) {
+    return keywords
+      .flatMap((keyword) => normalizeKeywords(keyword))
+      .filter((keyword, index, collection) => collection.indexOf(keyword) === index);
+  }
+
+  if (typeof keywords === 'string') {
+    const normalized = keywords.trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(normalized);
+      return normalizeKeywords(parsed);
+    } catch {
+      return normalized
+        .replace(/^[\[]+|[\]]+$/g, '')
+        .split(',')
+        .map((keyword) => keyword.trim().replace(/^['"]+|['"]+$/g, ''))
+        .filter(isDisplayableKeyword);
+    }
+  }
+
+  return [];
+};
+
 export function DocumentCard({ document, variant = 'default' }: DocumentCardProps) {
+  // Normalize keywords từ document
+  const keywords = normalizeKeywords(document.keywords);
   // Format file size
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return 'N/A';
@@ -125,12 +169,12 @@ export function DocumentCard({ document, variant = 'default' }: DocumentCardProp
               </p>
               {document.inspectionId && (
                 <Badge variant="info" size="sm" icon={<Cpu className="h-3 w-3" />}>
-                  Rust
+                  Đã phân tích
                 </Badge>
               )}
             </div>
           </div>
-          <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </Link>
       </Card>
     );
@@ -162,21 +206,20 @@ export function DocumentCard({ document, variant = 'default' }: DocumentCardProp
             {document.inspectionId && (
               <div className="mt-2">
                 <Badge variant="info" size="sm" icon={<Cpu className="h-3 w-3" />}>
-                  Inspected by Rust
+                  Đã phân tích
                 </Badge>
               </div>
             )}
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Link
-              href={`/documents/${document.id}`}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Link>
-          </div>
+          {/* Quick Actions - Luôn hiển thị */}
+          <Link
+            href={`/documents/${document.id}`}
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+            title="Xem chi tiết"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Link>
         </div>
       </CardHeader>
 
@@ -186,17 +229,17 @@ export function DocumentCard({ document, variant = 'default' }: DocumentCardProp
           {document.description || 'Không có mô tả'}
         </p>
 
-        {/* Keywords */}
-        {Array.isArray(document.keywords) && document.keywords.length > 0 && (
+        {/* Keywords - đã normalize */}
+        {keywords.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {document.keywords.slice(0, 3).map((keyword, index) => (
-              <Badge key={index} variant="soft" size="sm">
+            {keywords.slice(0, 3).map((keyword, index) => (
+              <Badge key={index} variant="soft" size="sm" className="max-w-[120px] truncate">
                 {keyword}
               </Badge>
             ))}
-            {document.keywords.length > 3 && (
-              <Badge variant="outline" size="sm">
-                +{document.keywords.length - 3}
+            {keywords.length > 3 && (
+              <Badge variant="outline" size="sm" title={`${keywords.length - 3} từ khóa khác`}>
+                +{keywords.length - 3}
               </Badge>
             )}
           </div>

@@ -129,7 +129,7 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
               type="text"
-              placeholder="Tìm kiếm trong bài viết của bạn..."
+              placeholder="Lọc trong danh sách hiện tại..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -154,48 +154,52 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
       {/* News Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredNews.map((item) => (
-          <div key={item.id} className="relative group">
-            {/* Status Badge */}
-            <div className="absolute top-2 left-2 z-10">
-              {item.isPublished ? (
-                <Badge variant="success" className="shadow-sm text-xs">
-                  Đã đăng
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="shadow-sm text-xs">
-                  Bản nháp
-                </Badge>
-              )}
-              {item.isFeatured && (
-                <Badge variant="accent" className="shadow-sm ml-1 text-xs">
-                  Nổi bật
-                </Badge>
-              )}
+          <div key={item.id} className="relative">
+            {/* Status & Actions Bar - Luôn hiển thị, rõ ràng */}
+            <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between gap-2">
+              {/* Status Badges */}
+              <div className="flex flex-wrap gap-1">
+                {item.isPublished ? (
+                  <Badge variant="success" className="shadow-sm text-xs">
+                    Đã đăng
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="shadow-sm text-xs">
+                    Bản nháp
+                  </Badge>
+                )}
+                {item.isFeatured && (
+                  <Badge variant="accent" className="shadow-sm text-xs">
+                    Nổi bật
+                  </Badge>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-1">
+                <Link href={`/my-news/${item.id}/edit`}>
+                  <Button variant="secondary" size="sm" className="shadow-sm" title="Chỉnh sửa">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="shadow-sm"
+                  onClick={() => confirmDelete(item.id, item.title)}
+                  disabled={deletingId === item.id}
+                  title="Xóa bài viết"
+                >
+                  {deletingId === item.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <NewsCard news={item} />
-
-            {/* Action Buttons - Luôn hiển thị, rõ ràng hơn khi hover */}
-            <div className="absolute top-2 right-2 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-              <Link href={`/my-news/${item.id}/edit`}>
-                <Button variant="secondary" size="sm" className="shadow-sm">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="shadow-sm"
-                onClick={() => confirmDelete(item.id, item.title)}
-                disabled={deletingId === item.id}
-              >
-                {deletingId === item.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
           </div>
         ))}
       </div>

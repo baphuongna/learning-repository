@@ -114,8 +114,8 @@ export function DashboardOverview() {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    return (
+      <div className="space-y-6">
       {/* Page Header với welcome message */}
       <PageHeader
         title={`${getGreeting()}, ${user?.fullName?.split(' ').pop() ?? 'bạn'}!`}

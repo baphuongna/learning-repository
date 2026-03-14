@@ -5,7 +5,8 @@ import { DocumentCard } from './DocumentCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Document, documentsApi } from '@/lib/api';
-import { Search, RefreshCw, Trash2, FileText } from 'lucide-react';
+import { Search, RefreshCw, Trash2, FileText, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface MyDocumentListProps {
   onDelete?: (id: string) => void;
@@ -44,23 +45,49 @@ export function MyDocumentList({ onDelete }: MyDocumentListProps) {
   }, []);
 
   const handleDelete = async (id: string) => {
-    // Confirm trước khi xóa
-    if (!confirm('Bạn có chắc muốn xóa tài liệu này?')) {
-      return;
-    }
-
     try {
       setDeletingId(id);
       await documentsApi.delete(id);
       // Refresh danh sách sau khi xóa
       await fetchDocuments(meta.page);
       onDelete?.(id);
+      toast.success('Đã xóa tài liệu thành công');
     } catch (err) {
       console.error('Failed to delete document:', err);
-      alert('Không thể xóa tài liệu. Vui lòng thử lại.');
+      toast.error('Không thể xóa tài liệu. Vui lòng thử lại.');
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const confirmDelete = (id: string, title: string) => {
+    // Sử dụng toast với action thay vì confirm dialog
+    toast(
+      <div className="space-y-3">
+        <p className="font-medium">Xác nhận xóa tài liệu?</p>
+        <p className="text-sm text-muted-foreground">&ldquo;{title}&rdquo;</p>
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toast.dismiss()}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              toast.dismiss();
+              handleDelete(id);
+            }}
+          >
+            Xóa
+          </Button>
+        </div>
+      </div>,
+      { duration: 10000 }
+    );
   };
 
   // Filter local khi search (không có API search riêng cho my documents)
@@ -89,7 +116,7 @@ export function MyDocumentList({ onDelete }: MyDocumentListProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
           <Input
             type="text"
-            placeholder="Tìm kiếm trong tài liệu của bạn..."
+            placeholder="Lọc trong danh sách hiện tại..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -111,18 +138,19 @@ export function MyDocumentList({ onDelete }: MyDocumentListProps) {
       {/* Document Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDocuments.map((doc) => (
-          <div key={doc.id} className="relative group">
+          <div key={doc.id} className="relative">
             <DocumentCard document={doc} />
-            {/* Delete Button */}
+            {/* Delete Button - Luôn hiển thị, rõ ràng */}
             <Button
               variant="destructive"
               size="sm"
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => handleDelete(doc.id)}
+              className="absolute top-2 right-2 shadow-sm"
+              onClick={() => confirmDelete(doc.id, doc.title)}
               disabled={deletingId === doc.id}
+              title="Xóa tài liệu"
             >
               {deletingId === doc.id ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
