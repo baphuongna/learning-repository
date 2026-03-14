@@ -30,6 +30,7 @@ export function DocumentDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const fetchDocument = useCallback(async () => {
     try {
@@ -81,6 +82,7 @@ export function DocumentDetail() {
     }
 
     try {
+      setDownloading(true);
       const docId = document.id;
       const docFileName = document.fileName;
 
@@ -96,6 +98,8 @@ export function DocumentDetail() {
     } catch (err) {
       console.error('Download error:', err);
       alert('Không thể tải file');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -234,9 +238,13 @@ export function DocumentDetail() {
             </CardContent>
           </Card>
 
-          <Button className="w-full" onClick={handleDownload}>
-            <Download className="h-4 w-4 mr-2" />
-            Tải xuống
+          <Button className="w-full" onClick={handleDownload} disabled={downloading}>
+            {downloading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {downloading ? 'Đang tải...' : 'Tải xuống'}
           </Button>
         </div>
       </div>

@@ -150,6 +150,9 @@ export function MyDocumentList({ onDelete, onRefresh }: MyDocumentListProps) {
       )
     : documents;
 
+  // Derived state: refetching khi đã có data và đang loading
+  const isRefetching = loading && documents.length > 0;
+
   if (loading && documents.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -172,6 +175,7 @@ export function MyDocumentList({ onDelete, onRefresh }: MyDocumentListProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              disabled={loading}
             />
           </form>
         }
@@ -180,11 +184,12 @@ export function MyDocumentList({ onDelete, onRefresh }: MyDocumentListProps) {
             <Button
               variant="outline"
               onClick={() => setShowCreateFolder(true)}
+              disabled={loading}
             >
               <FolderPlus className="h-4 w-4 mr-2" />
               Tạo thư mục
             </Button>
-            <Button onClick={handleUpload}>
+            <Button onClick={handleUpload} disabled={loading}>
               <Plus className="h-4 w-4 mr-2" />
               Tải lên
             </Button>
@@ -237,6 +242,14 @@ export function MyDocumentList({ onDelete, onRefresh }: MyDocumentListProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Inline Refresh Indicator - chỉ hiện khi refetching (đã có data) */}
+      {isRefetching && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md animate-pulse">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Đang làm mới...</span>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
@@ -259,7 +272,7 @@ export function MyDocumentList({ onDelete, onRefresh }: MyDocumentListProps) {
               size="sm"
               className="absolute top-2 right-2 shadow-sm"
               onClick={() => confirmDelete(doc.id, doc.title)}
-              disabled={deletingId === doc.id}
+              disabled={deletingId === doc.id || loading}
               title="Xóa tài liệu"
             >
               {deletingId === doc.id ? (
