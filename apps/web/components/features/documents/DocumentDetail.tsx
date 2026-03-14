@@ -218,7 +218,7 @@ export function DocumentDetail() {
                 <div className="rounded-lg border bg-primary/5 p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <Cpu className="h-4 w-4 text-primary" />
-                    Rust inspection trace
+                    Lịch sử phân tích
                   </div>
                   <p className="mb-2 break-all text-xs text-muted-foreground">
                     {document.inspectionId}
@@ -227,7 +227,7 @@ export function DocumentDetail() {
                     href={`/rust-docs/${document.inspectionId}`}
                     className="text-sm font-medium text-primary hover:underline"
                   >
-                    Xem inspection chi tiết
+                    Xem chi tiết bản phân tích
                   </Link>
                 </div>
               )}

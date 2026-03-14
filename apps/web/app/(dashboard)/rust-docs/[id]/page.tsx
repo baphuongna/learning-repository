@@ -65,7 +65,7 @@ export default function RustInspectionDetailPage() {
           <Button asChild variant="outline">
             <Link href="/rust-docs">
               <ArrowLeft className="h-4 w-4" />
-              Quay lại Rust Inspector
+              Quay lại danh sách phân tích
             </Link>
           </Button>
         </CardContent>
@@ -77,7 +77,7 @@ export default function RustInspectionDetailPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Chi tiết inspection</h1>
+          <h1 className="text-3xl font-bold">Chi tiết bản phân tích</h1>
           <p className="max-w-3xl text-muted-foreground">
             Trang này hiển thị bản ghi cụ thể lấy trực tiếp từ `GET /inspections/:id` của Rust V2.
           </p>
@@ -96,10 +96,10 @@ export default function RustInspectionDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <FileJson2 className="h-5 w-5 text-primary" />
-              Metadata inspection
+              Thông tin bản phân tích
             </CardTitle>
             <CardDescription>
-              Thông tin đầy đủ của một lần inspect file đã được lưu vào DB hiện tại của project.
+              Thông tin đầy đủ của một lần phân tích tệp đã được lưu để bạn có thể tra cứu lại khi cần.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
@@ -109,7 +109,7 @@ export default function RustInspectionDetailPage() {
             <InfoItem label="Extension" value={inspection.extension || 'N/A'} />
             <InfoItem label="Kích thước" value={formatBytes(inspection.size_bytes)} />
             <InfoItem
-              label="Content type hỗ trợ"
+              label="Định dạng được hỗ trợ"
               value={inspection.supported_content_type ? 'Có' : 'Không'}
             />
             <div className="md:col-span-2 rounded-xl border bg-muted/20 p-4">
