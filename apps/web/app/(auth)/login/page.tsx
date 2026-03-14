@@ -51,7 +51,7 @@ export default function LoginPage() {
       setError(null);
       const response = await authApi.login(data);
       login(response.accessToken, response.user);
-      router.push('/documents');
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.response?.data?.message || 'Đăng nhập thất bại');

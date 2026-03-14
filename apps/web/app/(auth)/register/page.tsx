@@ -60,7 +60,7 @@ export default function RegisterPage() {
         password: data.password,
       });
       login(response.accessToken, response.user);
-      router.push('/documents');
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Register error:', err);
       setError(err.response?.data?.message || 'Đăng ký thất bại');
