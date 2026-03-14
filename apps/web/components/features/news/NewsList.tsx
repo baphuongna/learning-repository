@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { SkeletonNewsCard } from '@/components/ui/skeleton';
 import { EmptyNews } from '@/components/ui/empty-state';
 import { NewsletterBanner } from '@/components/news/NewsletterBanner';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, LayoutGrid, List, SlidersHorizontal } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, LayoutGrid, List, SlidersHorizontal, Loader2 } from 'lucide-react';
 
 /**
  * NewsList Component - EduModern Design System
@@ -91,6 +91,9 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
     return news.filter((item) => !excludeIds.includes(item.id));
   }, [news, excludeIds]);
 
+  // Refetching state: loading when content already visible
+  const isRefetching = loading && news.length > 0;
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     void fetchNews(1);
@@ -166,7 +169,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
               className="pr-12"
             />
           </div>
-          <Button type="submit" variant="default" className="shrink-0">
+          <Button type="submit" variant="default" className="shrink-0" disabled={isRefetching}>
             Tìm
           </Button>
         </form>
@@ -202,7 +205,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
       <div className="flex flex-wrap gap-2">
         <Badge
           variant={selectedCategory === null ? 'default' : 'outline'}
-          className="cursor-pointer transition-all hover:scale-105"
+          className={`cursor-pointer transition-all hover:scale-105 ${isRefetching ? 'opacity-50 pointer-events-none' : ''}`}
           onClick={() => handleCategoryFilter(null)}
         >
           Tất cả
@@ -211,7 +214,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
           <Badge
             key={category.id}
             variant={selectedCategory === category.id ? 'default' : 'outline'}
-            className="cursor-pointer transition-all hover:scale-105"
+            className={`cursor-pointer transition-all hover:scale-105 ${isRefetching ? 'opacity-50 pointer-events-none' : ''}`}
             onClick={() => handleCategoryFilter(category.id)}
           >
             {category.name}
@@ -222,17 +225,26 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
       {/* Results count */}
       {filteredNews.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <SlidersHorizontal className="h-4 w-4" />
-          <span>
-            Hiển thị <strong className="text-foreground">{filteredNews.length}</strong> bài viết
-          </span>
+          {isRefetching ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-primary/80">Đang cập nhật...</span>
+            </>
+          ) : (
+            <>
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>
+                Hiển thị <strong className="text-foreground">{filteredNews.length}</strong> bài viết
+              </span>
+            </>
+          )}
         </div>
       )}
 
       {/* News Grid/List with Newsletter */}
       {filteredNews.length > 0 ? (
         viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-300 ${isRefetching ? 'opacity-60' : ''}`}>
             {firstSix.map((item, index) => (
               <div
                 key={item.id}
@@ -255,7 +267,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className={`space-y-4 transition-opacity duration-300 ${isRefetching ? 'opacity-60' : ''}`}>
             {filteredNews.map((item, index) => (
               <div
                 key={item.id}
@@ -277,7 +289,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
           <Button
             variant="outline"
             size="sm"
-            disabled={meta.page === 1}
+            disabled={meta.page === 1 || isRefetching}
             onClick={() => handlePageChange(meta.page - 1)}
             className="gap-1"
           >
@@ -309,6 +321,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
                     size="sm"
                     className={`w-9 ${meta.page === page ? 'shadow-sm' : ''}`}
                     onClick={() => handlePageChange(page)}
+                    disabled={isRefetching}
                   >
                     {page}
                   </Button>
@@ -319,7 +332,7 @@ export function NewsList({ initialCategory, excludeIds = [] }: NewsListProps) {
           <Button
             variant="outline"
             size="sm"
-            disabled={meta.page === meta.totalPages}
+            disabled={meta.page === meta.totalPages || isRefetching}
             onClick={() => handlePageChange(meta.page + 1)}
             className="gap-1"
           >

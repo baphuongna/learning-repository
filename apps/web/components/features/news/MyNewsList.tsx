@@ -111,6 +111,9 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
       )
     : news;
 
+  // Derived state: refetching khi đã có data và đang loading
+  const isRefetching = loading && news.length > 0;
+
   if (loading && news.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -133,16 +136,25 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              disabled={loading}
             />
           </div>
         }
         actions={
-          <Button onClick={handleCreateNew}>
+          <Button onClick={handleCreateNew} disabled={loading}>
             <Plus className="h-4 w-4 mr-2" />
             Viết bài mới
           </Button>
         }
       />
+
+      {/* Inline Refresh Indicator - chỉ hiện khi refetching (đã có data) */}
+      {isRefetching && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md animate-pulse">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Đang làm mới...</span>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -152,7 +164,7 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
       )}
 
       {/* News Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-300 ${loading ? 'opacity-60' : ''}`}>
         {filteredNews.map((item) => (
           <div key={item.id} className="relative">
             {/* Status & Actions Bar - Luôn hiển thị, rõ ràng */}
@@ -178,7 +190,7 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
               {/* Action Buttons */}
               <div className="flex gap-1">
                 <Link href={`/my-news/${item.id}/edit`}>
-                  <Button variant="secondary" size="sm" className="shadow-sm" title="Chỉnh sửa">
+                  <Button variant="secondary" size="sm" className="shadow-sm" title="Chỉnh sửa" disabled={loading}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -187,7 +199,7 @@ export function MyNewsList({ onDelete, onRefresh }: MyNewsListProps) {
                   size="sm"
                   className="shadow-sm"
                   onClick={() => confirmDelete(item.id, item.title)}
-                  disabled={deletingId === item.id}
+                  disabled={deletingId === item.id || loading}
                   title="Xóa bài viết"
                 >
                   {deletingId === item.id ? (
