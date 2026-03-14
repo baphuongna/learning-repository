@@ -16,6 +16,10 @@ import { AlertCircle, CheckCircle2, Cpu, FileSearch, Hash, Loader2, Upload, X, F
 import { FolderBreadcrumb } from '@/components/folders/FolderBreadcrumb';
 import { toast } from 'sonner';
 
+const uploadDebug = (label: string, payload?: Record<string, unknown>) => {
+  console.info(`[DocumentUpload] ${label}`, payload ?? {});
+};
+
 const schema = z.object({
   title: z.string().min(1, 'Tiêu đề không được để trống'),
   description: z.string().optional(),
@@ -56,6 +60,12 @@ export function DocumentUpload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      uploadDebug('file-selected', {
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type,
+        lastModified: selectedFile.lastModified,
+      });
       setFile(selectedFile);
       setInspectionResult(null);
       setInspectionError(null);
@@ -75,12 +85,31 @@ export function DocumentUpload() {
     setIsInspecting(true);
     setInspectionError(null);
 
+    uploadDebug('inspect-start', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+    });
+
     try {
       const response = await rustDocsApi.inspectFile(file);
+      uploadDebug('inspect-success', {
+        inspectionId: response.persisted.id,
+        filename: response.data.filename,
+        sizeBytes: response.data.size_bytes,
+        contentType: response.data.content_type,
+        supportedContentType: response.data.supported_content_type,
+      });
       setInspectionResult(response);
       toast.success('Phân tích file thành công');
     } catch (err: any) {
       console.error('Inspect error:', err);
+      uploadDebug('inspect-failed', {
+        message: err?.message,
+        responseStatus: err?.response?.status,
+        responseData: err?.response?.data,
+      });
       setInspectionResult(null);
       setInspectionError(err.response?.data?.message || 'Phân tích file thất bại');
       toast.error('Phân tích file thất bại');
@@ -114,11 +143,53 @@ export function DocumentUpload() {
         formData.append('inspectionId', inspectionResult.persisted.id);
       }
 
+      const formDataEntries = Array.from(formData.entries()).map(([key, value]) => {
+        if (value instanceof File) {
+          return {
+            key,
+            kind: 'file',
+            name: value.name,
+            size: value.size,
+            type: value.type,
+            lastModified: value.lastModified,
+          };
+        }
+
+        return {
+          key,
+          kind: 'text',
+          value,
+        };
+      });
+
+      uploadDebug('upload-start', {
+        requestUrl: '/v2/documents',
+        fileState: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        },
+        inspectionId: inspectionResult?.persisted.id ?? null,
+        folderId: data.folderId ?? null,
+        formDataEntries,
+      });
+
       await documentsApi.create(formData);
+      uploadDebug('upload-success', {
+        fileName: file.name,
+        inspectionId: inspectionResult?.persisted.id ?? null,
+      });
       toast.success('Tải lên tài liệu thành công!');
       router.push('/documents');
     } catch (err: any) {
       console.error('Upload error:', err);
+      uploadDebug('upload-failed', {
+        message: err?.message,
+        code: err?.code,
+        responseStatus: err?.response?.status,
+        responseData: err?.response?.data,
+      });
       setError(err.response?.data?.message || 'Upload thất bại');
       toast.error('Tải lên tài liệu thất bại');
     } finally {
