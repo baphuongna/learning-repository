@@ -68,7 +68,7 @@ export function DocumentUpload() {
 
   const handleInspectFile = async () => {
     if (!file) {
-      setInspectionError('Vui lòng chọn file trước khi inspect');
+      setInspectionError('Vui lòng chọn file trước khi phân tích');
       return;
     }
 
@@ -78,12 +78,12 @@ export function DocumentUpload() {
     try {
       const response = await rustDocsApi.inspectFile(file);
       setInspectionResult(response);
-      toast.success('Inspect file thành công qua Rust service');
+      toast.success('Phân tích file thành công');
     } catch (err: any) {
       console.error('Inspect error:', err);
       setInspectionResult(null);
-      setInspectionError(err.response?.data?.message || 'Inspect file thất bại');
-      toast.error('Inspect file thất bại');
+      setInspectionError(err.response?.data?.message || 'Phân tích file thất bại');
+      toast.error('Phân tích file thất bại');
     } finally {
       setIsInspecting(false);
     }
@@ -205,7 +205,7 @@ export function DocumentUpload() {
                 disabled={uploading || isInspecting}
               >
                 {isInspecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4" />}
-                {isInspecting ? 'Đang inspect...' : 'Inspect bằng Rust'}
+                {isInspecting ? 'Đang phân tích...' : 'Phân tích file'}
               </Button>
               <Button
                 type="button"
@@ -223,7 +223,7 @@ export function DocumentUpload() {
           )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Bạn có thể inspect file trước khi upload để xem metadata và hash được xử lý bởi Rust service.
+          Bạn có thể phân tích file trước khi tải lên để xem thông tin chi tiết và mã hash.
         </p>
       </div>
 
@@ -231,7 +231,7 @@ export function DocumentUpload() {
         <div className="space-y-3 rounded-xl border bg-card/60 p-4">
           <div className="flex items-center gap-2">
             <FileSearch className="h-4 w-4 text-primary" />
-            <h3 className="font-medium">Kết quả inspect trước khi upload</h3>
+            <h3 className="font-medium">Kết quả phân tích file</h3>
           </div>
 
           {inspectionError && (
@@ -248,12 +248,12 @@ export function DocumentUpload() {
               <InspectInfo label="Extension" value={inspectionResult.data.extension || 'N/A'} />
               <InspectInfo label="Kích thước" value={formatFileSize(inspectionResult.data.size_bytes)} />
               <InspectInfo
-                label="Content type hỗ trợ"
+                label="Định dạng được hỗ trợ"
                 value={inspectionResult.data.supported_content_type ? 'Có' : 'Không'}
                 icon={inspectionResult.data.supported_content_type ? CheckCircle2 : AlertCircle}
               />
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="mb-2 text-sm font-medium">Inspection record</div>
+                <div className="mb-2 text-sm font-medium">Bản ghi phân tích</div>
                 <Link
                   href={`/rust-docs/${inspectionResult.persisted.id}`}
                   className="break-all text-sm text-primary hover:underline"

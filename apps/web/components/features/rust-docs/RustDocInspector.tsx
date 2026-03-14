@@ -87,10 +87,10 @@ export function RustDocInspector() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Server className="h-5 w-5 text-primary" />
-                  Rust File Inspector
+                  Phân tích tệp tin
                 </CardTitle>
                 <CardDescription>
-                  Upload một file để frontend gọi trực tiếp Rust V2, service sẽ inspect và lưu lịch sử vào DB hiện tại của project.
+                  Tải lên một tệp để hệ thống phân tích nội dung và lưu lại lịch sử xử lý cho bạn tra cứu.
                 </CardDescription>
               </div>
               <div className="rounded-lg border border-primary/20 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
@@ -115,7 +115,7 @@ export function RustDocInspector() {
                   <FileUp className="h-7 w-7" />
                 </div>
                 <div>
-                  <p className="font-medium">Chọn file để inspect bằng Rust service</p>
+                  <p className="font-medium">Chọn tệp để phân tích</p>
                   <p className="text-sm text-muted-foreground">
                     Hỗ trợ tốt nhất với PDF, DOC, DOCX, TXT, PNG, JPEG theo whitelist hiện tại của service.
                   </p>
