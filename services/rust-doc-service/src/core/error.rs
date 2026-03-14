@@ -16,8 +16,13 @@ pub enum AppError {
     NotFound(String),
     Conflict(String), // New: for duplicate resources
     Internal(String),
-    PayloadTooLarge { limit_bytes: usize, actual_bytes: usize },
-    UnsupportedContentType { received: String },
+    PayloadTooLarge {
+        limit_bytes: usize,
+        actual_bytes: usize,
+    },
+    UnsupportedContentType {
+        received: String,
+    },
     Multipart(MultipartError),
     Database(sqlx::Error),
 }
@@ -54,9 +59,7 @@ impl IntoResponse for AppError {
             } => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "PAYLOAD_TOO_LARGE",
-                format!(
-                    "File size {actual_bytes} bytes exceeds limit {limit_bytes} bytes"
-                ),
+                format!("File size {actual_bytes} bytes exceeds limit {limit_bytes} bytes"),
             ),
             Self::UnsupportedContentType { received } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -64,7 +67,7 @@ impl IntoResponse for AppError {
                 format!("Unsupported content type: {received}"),
             ),
             Self::Multipart(error) => {
-                error!(error = %error, "multipart parsing failed");
+                error!(error = %error, error_debug = ?error, "multipart parsing failed");
                 (
                     StatusCode::BAD_REQUEST,
                     "MULTIPART_ERROR",
@@ -81,7 +84,13 @@ impl IntoResponse for AppError {
             }
         };
 
-        (status, Json(ErrorEnvelope { error: ErrorBody { code, message } })).into_response()
+        (
+            status,
+            Json(ErrorEnvelope {
+                error: ErrorBody { code, message },
+            }),
+        )
+            .into_response()
     }
 }
 

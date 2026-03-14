@@ -1,10 +1,11 @@
 use axum::{
     body::Body,
     extract::{Multipart, Path, Query, State},
-    http::{header, StatusCode},
+    http::{header, HeaderMap, StatusCode},
     response::Response,
     Json,
 };
+use tracing::{error, info};
 
 use crate::{
     app_state::AppState,
@@ -25,10 +26,39 @@ use crate::{
 
 pub async fn create_document_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
     current_user: CurrentUser,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<crate::documents::DocumentResponse>)> {
     let current_user = current_user.user();
+    let upload_request_id = uuid::Uuid::new_v4().to_string();
+    let client_request_id = headers
+        .get("x-client-request-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let content_length = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+
+    info!(
+        request_id = %upload_request_id,
+        client_request_id = ?client_request_id,
+        user_id = %current_user.id,
+        role = %current_user.role,
+        content_length = ?content_length,
+        user_agent = ?user_agent,
+        origin = ?origin,
+        "document upload started"
+    );
 
     let mut title: Option<String> = None;
     let mut description: Option<String> = None;
@@ -40,32 +70,163 @@ pub async fn create_document_handler(
     let mut inspection_id: Option<String> = None;
     let mut uploaded_file: Option<UploadedFile> = None;
 
-    while let Some(field) = multipart.next_field().await? {
+    while let Some(field) = multipart.next_field().await.map_err(|error| {
+        error!(
+            request_id = %upload_request_id,
+            client_request_id = ?client_request_id,
+            stage = "next_field",
+            error = %error,
+            "document upload multipart read failed"
+        );
+        AppError::Multipart(error)
+    })? {
         let field_name = field.name().map(ToOwned::to_owned);
+        let file_name = field.file_name().map(ToOwned::to_owned);
+        let content_type = field.content_type().map(ToOwned::to_owned);
+
+        info!(
+            request_id = %upload_request_id,
+            client_request_id = ?client_request_id,
+            field_name = ?field_name,
+            file_name = ?file_name,
+            content_type = ?content_type,
+            "document upload field received"
+        );
 
         match field_name.as_deref() {
             Some("file") => {
-                let filename = field.file_name().map(ToOwned::to_owned);
-                let content_type = field.content_type().map(ToOwned::to_owned);
-                let bytes = field.bytes().await?;
+                let bytes = field.bytes().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        client_request_id = ?client_request_id,
+                        stage = "file_bytes",
+                        file_name = ?file_name,
+                        content_type = ?content_type,
+                        error = %error,
+                        "document upload file bytes read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+
+                info!(
+                    request_id = %upload_request_id,
+                    client_request_id = ?client_request_id,
+                    file_name = ?file_name,
+                    content_type = ?content_type,
+                    file_size_bytes = bytes.len(),
+                    "document upload file field parsed"
+                );
 
                 uploaded_file = Some(UploadedFile {
-                    filename,
+                    filename: file_name,
                     content_type,
                     bytes,
                 });
             }
-            Some("title") => title = Some(field.text().await?),
-            Some("description") => description = Some(field.text().await?),
-            Some("author") => author = Some(field.text().await?),
-            Some("subject") => subject = Some(field.text().await?),
-            Some("keywords") => keywords_raw = Some(field.text().await?),
-            Some("isPublic") => {
-                let value = field.text().await?;
-                is_public = parse_bool(Some(&value));
+            Some("title") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "title_text",
+                        error = %error,
+                        "document upload title read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, title_length = value.len(), "document upload title parsed");
+                title = Some(value);
             }
-            Some("folderId") => folder_id = Some(field.text().await?),
-            Some("inspectionId") => inspection_id = Some(field.text().await?),
+            Some("description") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "description_text",
+                        error = %error,
+                        "document upload description read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, description_length = value.len(), "document upload description parsed");
+                description = Some(value);
+            }
+            Some("author") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "author_text",
+                        error = %error,
+                        "document upload author read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, author_length = value.len(), "document upload author parsed");
+                author = Some(value);
+            }
+            Some("subject") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "subject_text",
+                        error = %error,
+                        "document upload subject read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, subject_length = value.len(), "document upload subject parsed");
+                subject = Some(value);
+            }
+            Some("keywords") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "keywords_text",
+                        error = %error,
+                        "document upload keywords read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, keywords_length = value.len(), "document upload keywords parsed");
+                keywords_raw = Some(value);
+            }
+            Some("isPublic") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "is_public_text",
+                        error = %error,
+                        "document upload isPublic read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                is_public = parse_bool(Some(&value));
+                info!(request_id = %upload_request_id, raw_value = %value, parsed_value = is_public, "document upload isPublic parsed");
+            }
+            Some("folderId") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "folder_id_text",
+                        error = %error,
+                        "document upload folderId read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, folder_id = %value, "document upload folderId parsed");
+                folder_id = Some(value);
+            }
+            Some("inspectionId") => {
+                let value = field.text().await.map_err(|error| {
+                    error!(
+                        request_id = %upload_request_id,
+                        stage = "inspection_id_text",
+                        error = %error,
+                        "document upload inspectionId read failed"
+                    );
+                    AppError::Multipart(error)
+                })?;
+                info!(request_id = %upload_request_id, inspection_id = %value, "document upload inspectionId parsed");
+                inspection_id = Some(value);
+            }
             _ => {}
         }
     }
@@ -77,6 +238,17 @@ pub async fn create_document_handler(
 
     let uploaded_file = uploaded_file
         .ok_or_else(|| AppError::BadRequest("Expected multipart field named `file`".to_string()))?;
+
+    info!(
+        request_id = %upload_request_id,
+        client_request_id = ?client_request_id,
+        file_name = ?uploaded_file.filename,
+        file_content_type = ?uploaded_file.content_type,
+        file_size_bytes = uploaded_file.bytes.len(),
+        has_folder_id = folder_id.as_ref().is_some_and(|value| !value.trim().is_empty()),
+        has_inspection_id = inspection_id.as_ref().is_some_and(|value| !value.trim().is_empty()),
+        "document upload multipart parsing completed"
+    );
 
     // Validate folder ownership - user chỉ có thể upload vào folder của mình
     let folder_id_normalized = normalize_optional_text(folder_id.clone());
@@ -119,6 +291,15 @@ pub async fn create_document_handler(
     let document = create_document(&state.db_pool, &current_user.id, &payload, &stored_file)
         .await?
         .into_response();
+
+    info!(
+        request_id = %upload_request_id,
+        client_request_id = ?client_request_id,
+        title = %document.title,
+        file_name = %document.fileName,
+        document_id = %document.id,
+        "document upload completed successfully"
+    );
 
     // Auto-share parent folders if document is created as public
     if is_public {
