@@ -44,7 +44,7 @@ const baseNavigationGroups: NavigationGroup[] = [
     title: 'Tổng quan',
     items: [
       {
-        title: 'Dashboard',
+        title: 'Trang chủ',
         href: '/dashboard',
         icon: Home,
         match: ['/dashboard'],
@@ -89,7 +89,7 @@ const baseNavigationGroups: NavigationGroup[] = [
     title: 'Công cụ',
     items: [
       {
-        title: 'Rust Inspector',
+        title: 'Phân tích file',
         href: '/rust-docs',
         icon: Cpu,
         match: ['/rust-docs'],
