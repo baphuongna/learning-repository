@@ -11,6 +11,7 @@
     "dev:web": "turbo run dev --filter=web",
     "dev:rust:log": "node scripts/run-with-log.mjs rust-doc-service cargo run --manifest-path services/rust-doc-service/Cargo.toml",
     "dev:web:log": "node scripts/run-with-log.mjs web-3000 pnpm --filter web dev",
+    "dev:web:clean": "node scripts/restart-web-clean.mjs",
     "clean:tmp": "node scripts/clean-tmp.mjs",
     "db:generate": "pnpm --filter data db:generate",
     "db:push": "pnpm --filter data db:push",
