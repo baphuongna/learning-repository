@@ -10,12 +10,18 @@ async function main() {
   const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: {
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      canApproveUsers: true,
+    },
     create: {
       email: 'admin@example.com',
       fullName: 'Admin User',
       passwordHash: adminPassword,
       role: 'ADMIN',
+      status: 'ACTIVE',
+      canApproveUsers: true,
     },
   });
   console.log('Đã tạo admin:', admin.email);
@@ -24,12 +30,18 @@ async function main() {
   const userPassword = await bcrypt.hash('user123', 10);
   const user = await prisma.user.upsert({
     where: { email: 'user@example.com' },
-    update: {},
+    update: {
+      role: 'USER',
+      status: 'ACTIVE',
+      canApproveUsers: false,
+    },
     create: {
       email: 'user@example.com',
       fullName: 'Test User',
       passwordHash: userPassword,
       role: 'USER',
+      status: 'ACTIVE',
+      canApproveUsers: false,
     },
   });
   console.log('Đã tạo user:', user.email);

@@ -1035,6 +1035,21 @@ pub async fn find_user_by_email(
             "fullName" AS full_name,
             password_hash,
             role,
+            status,
+            can_approve_users,
+            approved_by,
+            CASE
+                WHEN approved_at IS NULL THEN NULL
+                WHEN typeof(approved_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', approved_at / 1000.0, 'unixepoch')
+                ELSE approved_at
+            END AS approved_at,
+            rejected_by,
+            CASE
+                WHEN rejected_at IS NULL THEN NULL
+                WHEN typeof(rejected_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', rejected_at / 1000.0, 'unixepoch')
+                ELSE rejected_at
+            END AS rejected_at,
+            rejection_reason,
             avatar_url,
             CASE
                 WHEN typeof(created_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at / 1000.0, 'unixepoch')
@@ -1062,6 +1077,21 @@ pub async fn find_user_by_id(
             "fullName" AS full_name,
             password_hash,
             role,
+            status,
+            can_approve_users,
+            approved_by,
+            CASE
+                WHEN approved_at IS NULL THEN NULL
+                WHEN typeof(approved_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', approved_at / 1000.0, 'unixepoch')
+                ELSE approved_at
+            END AS approved_at,
+            rejected_by,
+            CASE
+                WHEN rejected_at IS NULL THEN NULL
+                WHEN typeof(rejected_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', rejected_at / 1000.0, 'unixepoch')
+                ELSE rejected_at
+            END AS rejected_at,
+            rejection_reason,
             avatar_url,
             CASE
                 WHEN typeof(created_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at / 1000.0, 'unixepoch')
@@ -1094,9 +1124,16 @@ pub async fn create_user(
             "fullName",
             password_hash,
             role,
+            status,
+            can_approve_users,
+            approved_by,
+            approved_at,
+            rejected_by,
+            rejected_at,
+            rejection_reason,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, 'USER', ?, ?)
+        ) VALUES (?, ?, ?, ?, 'USER', 'PENDING', 0, NULL, NULL, NULL, NULL, NULL, ?, ?)
         "#,
     )
     .bind(&user_id)
@@ -1124,6 +1161,8 @@ pub async fn get_profile_by_user_id(
             u.email,
             u."fullName" AS full_name,
             u.role,
+            u.status,
+            u.can_approve_users,
             u.avatar_url,
             CASE
                 WHEN typeof(u.created_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', u.created_at / 1000.0, 'unixepoch')
@@ -1193,6 +1232,123 @@ pub async fn update_user_password(
     .await?;
 
     Ok(())
+}
+
+pub async fn list_users_for_admin(
+    pool: &SqlitePool,
+    status: Option<&str>,
+    search: Option<&str>,
+) -> Result<Vec<UserRecord>, sqlx::Error> {
+    sqlx::query_as::<_, UserRow>(
+        r#"
+        SELECT
+            id,
+            email,
+            "fullName" AS full_name,
+            password_hash,
+            role,
+            status,
+            can_approve_users,
+            approved_by,
+            CASE
+                WHEN approved_at IS NULL THEN NULL
+                WHEN typeof(approved_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', approved_at / 1000.0, 'unixepoch')
+                ELSE approved_at
+            END AS approved_at,
+            rejected_by,
+            CASE
+                WHEN rejected_at IS NULL THEN NULL
+                WHEN typeof(rejected_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', rejected_at / 1000.0, 'unixepoch')
+                ELSE rejected_at
+            END AS rejected_at,
+            rejection_reason,
+            avatar_url,
+            CASE
+                WHEN typeof(created_at) = 'integer' THEN strftime('%Y-%m-%dT%H:%M:%fZ', created_at / 1000.0, 'unixepoch')
+                ELSE created_at
+            END AS created_at
+        FROM users
+        WHERE (? IS NULL OR status = ?)
+          AND (
+            ? IS NULL
+            OR email LIKE ?
+            OR "fullName" LIKE ?
+          )
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(status)
+    .bind(status)
+    .bind(search)
+    .bind(search.map(|value| format!("%{value}%")))
+    .bind(search.map(|value| format!("%{value}%")))
+    .fetch_all(pool)
+    .await
+    .map(|rows| rows.into_iter().map(map_user_row).collect())
+}
+
+pub async fn approve_user(
+    pool: &SqlitePool,
+    user_id: &str,
+    approved_by: &str,
+) -> Result<Option<UserRecord>, sqlx::Error> {
+    let now = current_timestamp_millis();
+
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET
+            status = 'ACTIVE',
+            approved_by = ?,
+            approved_at = ?,
+            rejected_by = NULL,
+            rejected_at = NULL,
+            rejection_reason = NULL,
+            updated_at = ?
+        WHERE id = ?
+        "#,
+    )
+    .bind(approved_by)
+    .bind(now)
+    .bind(now)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    find_user_by_id(pool, user_id).await
+}
+
+pub async fn reject_user(
+    pool: &SqlitePool,
+    user_id: &str,
+    rejected_by: &str,
+    reason: Option<&str>,
+) -> Result<Option<UserRecord>, sqlx::Error> {
+    let now = current_timestamp_millis();
+
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET
+            status = 'REJECTED',
+            approved_by = NULL,
+            approved_at = NULL,
+            rejected_by = ?,
+            rejected_at = ?,
+            rejection_reason = ?,
+            updated_at = ?
+        WHERE id = ?
+        "#,
+    )
+    .bind(rejected_by)
+    .bind(now)
+    .bind(reason)
+    .bind(now)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    find_user_by_id(pool, user_id).await
 }
 
 pub async fn list_news_categories(pool: &SqlitePool, admin: bool) -> Result<Vec<NewsCategoryRecord>, sqlx::Error> {
@@ -1790,6 +1946,13 @@ struct UserRow {
     full_name: String,
     password_hash: String,
     role: String,
+    status: String,
+    can_approve_users: bool,
+    approved_by: Option<String>,
+    approved_at: Option<String>,
+    rejected_by: Option<String>,
+    rejected_at: Option<String>,
+    rejection_reason: Option<String>,
     avatar_url: Option<String>,
     created_at: String,
 }
@@ -1800,6 +1963,8 @@ struct ProfileRow {
     email: String,
     full_name: String,
     role: String,
+    status: String,
+    can_approve_users: bool,
     avatar_url: Option<String>,
     created_at: String,
     documents_count: i64,
@@ -1893,6 +2058,13 @@ fn map_user_row(row: UserRow) -> UserRecord {
         full_name: row.full_name,
         password_hash: row.password_hash,
         role: row.role,
+        status: row.status,
+        can_approve_users: row.can_approve_users,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
+        rejected_by: row.rejected_by,
+        rejected_at: row.rejected_at,
+        rejection_reason: row.rejection_reason,
         avatar_url: row.avatar_url,
         created_at: row.created_at,
     }
@@ -1904,6 +2076,8 @@ fn map_profile_row(row: ProfileRow) -> ProfileResponse {
         email: row.email,
         fullName: row.full_name,
         role: row.role,
+        status: row.status,
+        canApproveUsers: row.can_approve_users,
         avatarUrl: row.avatar_url,
         createdAt: row.created_at,
         _count: ProfileCount {

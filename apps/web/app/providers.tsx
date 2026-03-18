@@ -23,6 +23,8 @@ interface User {
   email: string;
   fullName: string;
   role: string;
+  status?: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  canApproveUsers?: boolean;
   avatarUrl?: string;
 }
 

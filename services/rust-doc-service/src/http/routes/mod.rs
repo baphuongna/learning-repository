@@ -6,8 +6,9 @@ pub mod inspect;
 pub mod inspections;
 pub mod news;
 pub mod upload;
+pub mod users;
 
-use axum::{extract::DefaultBodyLimit, routing::{get, post, put}, Router};
+use axum::{extract::DefaultBodyLimit, routing::{get, patch, post, put}, Router};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::core::app_state::AppState;
@@ -22,6 +23,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/auth/me", get(auth::me_handler))
         .route("/auth/profile", put(auth::update_profile_handler))
         .route("/auth/change-password", put(auth::change_password_handler))
+        .route("/admin/users", get(users::list_users_handler))
+        .route("/admin/users/{id}/approve", patch(users::approve_user_handler))
+        .route("/admin/users/{id}/reject", patch(users::reject_user_handler))
         .route("/upload", post(upload::upload_file_handler).layer(DefaultBodyLimit::max(multipart_limit)))
         .route("/upload/{filename}", get(upload::get_uploaded_file_handler))
         .route("/news-categories", get(news::list_categories_handler).post(news::create_category_handler))

@@ -38,15 +38,11 @@ pub async fn register_handler(
     let password_hash = hash(&payload.password, 10)
         .map_err(|error| AppError::Internal(format!("Failed to hash password: {error}")))?;
     let user = create_user(&state.db_pool, &email, &full_name, &password_hash).await?;
-    let access_token = state
-        .config
-        .sign_jwt(&user.id, &user.email, &user.role)
-        .map_err(|error| AppError::Internal(format!("Failed to sign jwt: {error}")))?;
 
     Ok((
         StatusCode::CREATED,
         Json(AuthResponse {
-            accessToken: access_token,
+            accessToken: None,
             user: user.to_auth_user(),
         }),
     ))
@@ -68,13 +64,31 @@ pub async fn login_handler(
         return Err(AppError::Forbidden("Email hoặc mật khẩu không đúng".to_string()));
     }
 
+    if user.status == "PENDING" {
+        return Err(AppError::Forbidden(
+            "Tài khoản của bạn đang chờ phê duyệt.".to_string(),
+        ));
+    }
+
+    if user.status == "REJECTED" {
+        return Err(AppError::Forbidden(
+            "Tài khoản của bạn hiện chưa được phê duyệt.".to_string(),
+        ));
+    }
+
+    if user.status != "ACTIVE" {
+        return Err(AppError::Forbidden(
+            "Tài khoản của bạn hiện chưa được phê duyệt.".to_string(),
+        ));
+    }
+
     let access_token = state
         .config
         .sign_jwt(&user.id, &user.email, &user.role)
         .map_err(|error| AppError::Internal(format!("Failed to sign jwt: {error}")))?;
 
     Ok(Json(AuthResponse {
-        accessToken: access_token,
+        accessToken: Some(access_token),
         user: user.to_auth_user(),
     }))
 }

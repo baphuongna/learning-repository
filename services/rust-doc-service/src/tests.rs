@@ -36,6 +36,13 @@ mod tests {
                 fullName TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'USER',
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                can_approve_users BOOLEAN NOT NULL DEFAULT 0,
+                approved_by TEXT,
+                approved_at TEXT,
+                rejected_by TEXT,
+                rejected_at TEXT,
+                rejection_reason TEXT,
                 avatar_url TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -307,9 +314,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn register_and_me_routes_work_together() {
+    async fn register_creates_pending_user_and_login_is_gated_by_status() {
         let pool = setup_test_db().await;
-        let app = create_test_app(pool);
+        let app = create_test_app(pool.clone());
 
         let register_request = Request::builder()
             .method("POST")
@@ -328,27 +335,210 @@ mod tests {
 
         assert_eq!(register_response.status(), StatusCode::CREATED);
         let register_json = read_json(register_response).await;
-        let token = register_json["accessToken"]
-            .as_str()
-            .expect("token should exist")
-            .to_string();
+        assert!(register_json["accessToken"].is_null());
+        assert_eq!(register_json["user"]["status"], "PENDING");
 
-        let me_request = Request::builder()
-            .method("GET")
-            .uri("/auth/me")
-            .header("authorization", format!("Bearer {token}"))
-            .body(Body::empty())
+        let db_status: String = sqlx::query_scalar("SELECT status FROM users WHERE email = ?")
+            .bind("route@example.com")
+            .fetch_one(&pool)
+            .await
+            .expect("status should be queryable");
+        assert_eq!(db_status, "PENDING");
+
+        let pending_login_request = Request::builder()
+            .method("POST")
+            .uri("/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email":"route@example.com","password":"secret123"}"#,
+            ))
             .expect("request should build");
 
-        let me_response = app
-            .oneshot(me_request)
+        let pending_login_response = app
+            .clone()
+            .oneshot(pending_login_request)
             .await
-            .expect("me route should respond");
+            .expect("login route should respond");
+        assert_eq!(pending_login_response.status(), StatusCode::FORBIDDEN);
+        let pending_login_json = read_json(pending_login_response).await;
+        assert_eq!(
+            pending_login_json["error"]["message"],
+            "Tài khoản của bạn đang chờ phê duyệt."
+        );
 
-        assert_eq!(me_response.status(), StatusCode::OK);
-        let me_json = read_json(me_response).await;
-        assert_eq!(me_json["email"], "route@example.com");
-        assert_eq!(me_json["fullName"], "Route Tester");
+        sqlx::query("UPDATE users SET status = 'REJECTED' WHERE email = ?")
+            .bind("route@example.com")
+            .execute(&pool)
+            .await
+            .expect("status should update");
+
+        let rejected_login_request = Request::builder()
+            .method("POST")
+            .uri("/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email":"route@example.com","password":"secret123"}"#,
+            ))
+            .expect("request should build");
+
+        let rejected_login_response = app
+            .clone()
+            .oneshot(rejected_login_request)
+            .await
+            .expect("login route should respond");
+        assert_eq!(rejected_login_response.status(), StatusCode::FORBIDDEN);
+        let rejected_login_json = read_json(rejected_login_response).await;
+        assert_eq!(
+            rejected_login_json["error"]["message"],
+            "Tài khoản của bạn hiện chưa được phê duyệt."
+        );
+
+        sqlx::query("UPDATE users SET status = 'ACTIVE' WHERE email = ?")
+            .bind("route@example.com")
+            .execute(&pool)
+            .await
+            .expect("status should update");
+
+        let active_login_request = Request::builder()
+            .method("POST")
+            .uri("/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email":"route@example.com","password":"secret123"}"#,
+            ))
+            .expect("request should build");
+
+        let active_login_response = app
+            .oneshot(active_login_request)
+            .await
+            .expect("login route should respond");
+
+        assert_eq!(active_login_response.status(), StatusCode::OK);
+        let active_login_json = read_json(active_login_response).await;
+        assert!(active_login_json["accessToken"].as_str().is_some());
+        assert_eq!(active_login_json["user"]["status"], "ACTIVE");
+    }
+
+    #[tokio::test]
+    async fn moderation_endpoints_require_approver_permission_and_update_status() {
+        let pool = setup_test_db().await;
+        let admin = create_user(&pool, "admin-review@example.com", "Admin Reviewer", "hash")
+            .await
+            .expect("admin should be created");
+        sqlx::query("UPDATE users SET role = 'ADMIN', status = 'ACTIVE' WHERE id = ?")
+            .bind(&admin.id)
+            .execute(&pool)
+            .await
+            .expect("admin role should update");
+
+        let delegated = create_user(&pool, "delegated@example.com", "Delegated Reviewer", "hash")
+            .await
+            .expect("delegated reviewer should be created");
+        sqlx::query("UPDATE users SET status = 'ACTIVE', can_approve_users = 1 WHERE id = ?")
+            .bind(&delegated.id)
+            .execute(&pool)
+            .await
+            .expect("delegated permissions should update");
+
+        let normal_user = create_user(&pool, "normal@example.com", "Normal User", "hash")
+            .await
+            .expect("normal user should be created");
+        sqlx::query("UPDATE users SET status = 'ACTIVE' WHERE id = ?")
+            .bind(&normal_user.id)
+            .execute(&pool)
+            .await
+            .expect("normal status should update");
+
+        let pending_target = create_user(&pool, "pending@example.com", "Pending User", "hash")
+            .await
+            .expect("pending user should be created");
+
+        let admin_token = test_config()
+            .sign_jwt(&admin.id, &admin.email, "ADMIN")
+            .expect("admin jwt should sign");
+        let delegated_token = test_config()
+            .sign_jwt(&delegated.id, &delegated.email, "USER")
+            .expect("delegated jwt should sign");
+        let normal_token = test_config()
+            .sign_jwt(&normal_user.id, &normal_user.email, "USER")
+            .expect("normal jwt should sign");
+
+        let app = create_test_app(pool.clone());
+
+        let forbidden_list_request = Request::builder()
+            .method("GET")
+            .uri("/admin/users?status=PENDING")
+            .header("authorization", format!("Bearer {normal_token}"))
+            .body(Body::empty())
+            .expect("request should build");
+        let forbidden_list_response = app
+            .clone()
+            .oneshot(forbidden_list_request)
+            .await
+            .expect("list route should respond");
+        assert_eq!(forbidden_list_response.status(), StatusCode::FORBIDDEN);
+
+        let delegated_list_request = Request::builder()
+            .method("GET")
+            .uri("/admin/users?status=PENDING&search=pending")
+            .header("authorization", format!("Bearer {delegated_token}"))
+            .body(Body::empty())
+            .expect("request should build");
+        let delegated_list_response = app
+            .clone()
+            .oneshot(delegated_list_request)
+            .await
+            .expect("list route should respond");
+        assert_eq!(delegated_list_response.status(), StatusCode::OK);
+        let delegated_list_json = read_json(delegated_list_response).await;
+        assert_eq!(delegated_list_json[0]["email"], "pending@example.com");
+        assert_eq!(delegated_list_json[0]["status"], "PENDING");
+
+        let approve_request = Request::builder()
+            .method("PATCH")
+            .uri(format!("/admin/users/{}/approve", pending_target.id))
+            .header("authorization", format!("Bearer {delegated_token}"))
+            .body(Body::empty())
+            .expect("request should build");
+        let approve_response = app
+            .clone()
+            .oneshot(approve_request)
+            .await
+            .expect("approve route should respond");
+        assert_eq!(approve_response.status(), StatusCode::OK);
+
+        let approved_row: (String, Option<String>) =
+            sqlx::query_as("SELECT status, approved_by FROM users WHERE id = ?")
+                .bind(&pending_target.id)
+                .fetch_one(&pool)
+                .await
+                .expect("approved user should be queryable");
+        assert_eq!(approved_row.0, "ACTIVE");
+        assert_eq!(approved_row.1.as_deref(), Some(delegated.id.as_str()));
+
+        let reject_request = Request::builder()
+            .method("PATCH")
+            .uri(format!("/admin/users/{}/reject", pending_target.id))
+            .header("authorization", format!("Bearer {admin_token}"))
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"reason":"Thiếu thông tin hồ sơ"}"#))
+            .expect("request should build");
+        let reject_response = app
+            .oneshot(reject_request)
+            .await
+            .expect("reject route should respond");
+        assert_eq!(reject_response.status(), StatusCode::OK);
+
+        let rejected_row: (String, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT status, rejected_by, rejection_reason FROM users WHERE id = ?",
+        )
+        .bind(&pending_target.id)
+        .fetch_one(&pool)
+        .await
+        .expect("rejected user should be queryable");
+        assert_eq!(rejected_row.0, "REJECTED");
+        assert_eq!(rejected_row.1.as_deref(), Some(admin.id.as_str()));
+        assert_eq!(rejected_row.2.as_deref(), Some("Thiếu thông tin hồ sơ"));
     }
 
     #[tokio::test]

@@ -7,6 +7,13 @@ pub struct UserRecord {
     pub full_name: String,
     pub password_hash: String,
     pub role: String,
+    pub status: String,
+    pub can_approve_users: bool,
+    pub approved_by: Option<String>,
+    pub approved_at: Option<String>,
+    pub rejected_by: Option<String>,
+    pub rejected_at: Option<String>,
+    pub rejection_reason: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: String,
 }
@@ -18,6 +25,8 @@ pub struct AuthUserResponse {
     pub email: String,
     pub fullName: String,
     pub role: String,
+    pub status: String,
+    pub canApproveUsers: bool,
     pub avatarUrl: Option<String>,
     pub createdAt: Option<String>,
 }
@@ -25,7 +34,7 @@ pub struct AuthUserResponse {
 #[derive(Debug, Serialize)]
 #[allow(non_snake_case)]
 pub struct AuthResponse {
-    pub accessToken: String,
+    pub accessToken: Option<String>,
     pub user: AuthUserResponse,
 }
 
@@ -36,9 +45,29 @@ pub struct ProfileResponse {
     pub email: String,
     pub fullName: String,
     pub role: String,
+    pub status: String,
+    pub canApproveUsers: bool,
     pub avatarUrl: Option<String>,
     pub createdAt: String,
     pub _count: ProfileCount,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[allow(non_snake_case)]
+pub struct AdminUserResponse {
+    pub id: String,
+    pub email: String,
+    pub fullName: String,
+    pub role: String,
+    pub status: String,
+    pub canApproveUsers: bool,
+    pub approvedBy: Option<String>,
+    pub approvedAt: Option<String>,
+    pub rejectedBy: Option<String>,
+    pub rejectedAt: Option<String>,
+    pub rejectionReason: Option<String>,
+    pub avatarUrl: Option<String>,
+    pub createdAt: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,8 +110,28 @@ impl UserRecord {
             email: self.email.clone(),
             fullName: self.full_name.clone(),
             role: self.role.clone(),
+            status: self.status.clone(),
+            canApproveUsers: self.can_approve_users,
             avatarUrl: self.avatar_url.clone(),
             createdAt: Some(self.created_at.clone()),
+        }
+    }
+
+    pub fn to_admin_user(&self) -> AdminUserResponse {
+        AdminUserResponse {
+            id: self.id.clone(),
+            email: self.email.clone(),
+            fullName: self.full_name.clone(),
+            role: self.role.clone(),
+            status: self.status.clone(),
+            canApproveUsers: self.can_approve_users,
+            approvedBy: self.approved_by.clone(),
+            approvedAt: self.approved_at.clone(),
+            rejectedBy: self.rejected_by.clone(),
+            rejectedAt: self.rejected_at.clone(),
+            rejectionReason: self.rejection_reason.clone(),
+            avatarUrl: self.avatar_url.clone(),
+            createdAt: self.created_at.clone(),
         }
     }
 }

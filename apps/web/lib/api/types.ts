@@ -1,3 +1,11 @@
+/**
+ * Trạng thái tài khoản người dùng (match backend)
+ * - PENDING: Chờ phê duyệt (mặc định cho user mới)
+ * - ACTIVE: Đã được phê duyệt, có thể đăng nhập
+ * - REJECTED: Bị từ chối, không thể đăng nhập
+ */
+export type UserApprovalStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
+
 export interface User {
   id: string;
   email: string;
@@ -5,6 +13,53 @@ export interface User {
   role: string;
   avatarUrl?: string;
   createdAt?: string;
+  status?: UserApprovalStatus;
+  canApproveUsers?: boolean;
+}
+
+/**
+ * User data cho trang quản trị (match backend AdminUserResponse)
+ */
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  status: UserApprovalStatus;
+  canApproveUsers: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
+/**
+ * Response từ API đăng ký (match backend AuthResponse)
+ * - accessToken: Optional (null khi đăng ký, có khi login)
+ * - user: Thông tin user đã đăng ký
+ */
+export interface RegisterResponse {
+  accessToken?: string | null;
+  user?: {
+    id: string;
+    email: string;
+    fullName: string;
+    status: UserApprovalStatus;
+    canApproveUsers: boolean;
+    avatarUrl?: string;
+    createdAt?: string;
+  };
+}
+
+/**
+ * Query params cho API lấy danh sách users (match backend)
+ */
+export interface GetUsersParams {
+  status?: UserApprovalStatus;
+  search?: string;
 }
 
 export interface Document {

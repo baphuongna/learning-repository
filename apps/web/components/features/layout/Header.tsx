@@ -64,7 +64,7 @@ export function Header() {
 
   const navLinks = [
     { href: '/', label: 'Tin tức', match: ['/'] },
-    ...getNavigationItems(user?.role).map((item) => ({
+    ...getNavigationItems(user?.role, user?.canApproveUsers).map((item) => ({
       href: item.href,
       label: item.title,
       match: item.match,
@@ -138,9 +138,9 @@ export function Header() {
                   </div>
                 )}
                 <span className="hidden sm:inline font-medium">{user.fullName}</span>
-                {user.role === 'ADMIN' && (
+                {(user.role === 'ADMIN' || user.canApproveUsers) && (
                   <span className="hidden md:inline bg-accent/10 text-accent px-2 py-0.5 rounded-md text-xs font-semibold">
-                    Admin
+                    {user.role === 'ADMIN' ? 'Admin' : 'Duyệt user'}
                   </span>
                 )}
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
@@ -185,10 +185,10 @@ export function Header() {
                     </Link>
                   </div>
 
-                  {user.role === 'ADMIN' && (
+                  {(user.role === 'ADMIN' || user.canApproveUsers) && (
                     <div className="border-t border-border py-1">
                       <Link
-                        href="/admin/news"
+                        href={user.canApproveUsers && user.role !== 'ADMIN' ? '/admin/users' : '/admin/news'}
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors"
                       >

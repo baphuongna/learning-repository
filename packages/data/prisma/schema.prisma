@@ -15,6 +15,13 @@ model User {
   fullName     String
   passwordHash String     @map("password_hash")
   role         String     @default("USER") // ADMIN, USER
+  status       String     @default("PENDING") // PENDING, ACTIVE, REJECTED
+  canApproveUsers Boolean @default(false) @map("can_approve_users")
+  approvedBy   String?    @map("approved_by")
+  approvedAt   DateTime?  @map("approved_at")
+  rejectedBy   String?    @map("rejected_by")
+  rejectedAt   DateTime?  @map("rejected_at")
+  rejectionReason String? @map("rejection_reason")
   avatarUrl    String?    @map("avatar_url")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
@@ -24,6 +31,7 @@ model User {
   news         News[]
   folders      Folder[]
 
+  @@index([status])
   @@map("users")
 }
 

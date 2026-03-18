@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { authApi } from '@/lib/api';
-import { useAuth } from '@/app/providers';
-import { Loader2, ArrowLeft, User, Mail, Lock, UserPlus } from 'lucide-react';
+import { authApi, getErrorMessage } from '@/lib/api';
+import { Loader2, ArrowLeft, User, Mail, Lock, UserPlus, CheckCircle2, Clock } from 'lucide-react';
 
 const schema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -34,13 +33,15 @@ type FormData = z.infer<typeof schema>;
  * - Icon inputs
  * - Gradient button
  * - Form validation
+ * - Pending approval feedback (không auto-login)
  */
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   const {
     register,
@@ -54,20 +55,76 @@ export default function RegisterPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await authApi.register({
+      await authApi.register({
         email: data.email,
         fullName: data.fullName,
         password: data.password,
       });
-      login(response.accessToken, response.user);
-      router.push('/dashboard');
-    } catch (err: any) {
+      
+      // Đăng ký thành công - không auto-login, hiển thị thông báo chờ phê duyệt
+      setRegisteredEmail(data.email);
+      setSuccess(true);
+    } catch (err) {
       console.error('Register error:', err);
-      setError(err.response?.data?.message || 'Đăng ký thất bại');
+      setError(getErrorMessage(err, 'Đăng ký thất bại'));
     } finally {
       setLoading(false);
     }
   };
+
+  // Hiển thị màn hình thành công khi đã đăng ký
+  if (success) {
+    return (
+      <Card variant="elevated" className="border-0 shadow-2xl">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-teal-500/20 flex items-center justify-center">
+            <Clock className="h-8 w-8 text-primary" />
+          </div>
+          <CardTitle className="font-display text-2xl text-primary">
+            Đăng ký thành công!
+          </CardTitle>
+          <CardDescription className="text-base">
+            Tài khoản của bạn đang chờ phê duyệt
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4 pt-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="text-sm space-y-2">
+                <p className="font-medium text-foreground">
+                  Cảm ơn bạn đã đăng ký!
+                </p>
+                <p className="text-muted-foreground">
+                  Tài khoản <strong className="text-foreground">{registeredEmail}</strong> đã được tạo thành công 
+                  và đang chờ quản trị viên phê duyệt.
+                </p>
+                <p className="text-muted-foreground">
+                  Sau khi được phê duyệt, bạn có thể quay lại màn hình đăng nhập để truy cập hệ thống.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col gap-4 pt-4">
+          <Link href="/login" className="w-full">
+            <Button variant="gradient" className="w-full h-11 text-base">
+              Đăng nhập
+            </Button>
+          </Link>
+
+          <Link href="/" className="w-full">
+            <Button type="button" variant="ghost" className="w-full gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại trang chủ
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="elevated" className="border-0 shadow-2xl">

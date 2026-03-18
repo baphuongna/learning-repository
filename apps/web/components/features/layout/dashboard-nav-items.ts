@@ -8,6 +8,7 @@ import {
   Settings,
   Upload,
   User,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -122,6 +123,12 @@ const adminNavigationGroup: NavigationGroup = {
   title: 'Quản trị',
   items: [
     {
+      title: 'Quản lý người dùng',
+      href: '/admin/users',
+      icon: Users,
+      match: ['/admin/users'],
+    },
+    {
       title: 'Quản lý tin tức',
       href: '/admin/news',
       icon: Newspaper,
@@ -142,10 +149,10 @@ const adminNavigationGroup: NavigationGroup = {
  * @param role - User role (ADMIN, USER)
  * @returns Array of navigation groups
  */
-export function getNavigationGroups(role?: string): NavigationGroup[] {
+export function getNavigationGroups(role?: string, canApproveUsers?: boolean): NavigationGroup[] {
   const groups = [...baseNavigationGroups];
 
-  if (role === 'ADMIN') {
+  if (role === 'ADMIN' || canApproveUsers) {
     groups.push(adminNavigationGroup);
   }
 
@@ -159,8 +166,8 @@ export function getNavigationGroups(role?: string): NavigationGroup[] {
  * @param role - User role (ADMIN, USER)
  * @returns Array of navigation items
  */
-export function getNavigationItems(role?: string): NavigationItem[] {
-  return getNavigationGroups(role).flatMap((group) => group.items);
+export function getNavigationItems(role?: string, canApproveUsers?: boolean): NavigationItem[] {
+  return getNavigationGroups(role, canApproveUsers).flatMap((group) => group.items);
 }
 
 /**
