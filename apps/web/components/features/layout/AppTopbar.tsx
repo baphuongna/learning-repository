@@ -18,7 +18,9 @@ import {
 import {
   getUserMenuItems,
   getAdminMenuItem,
+  LOGOUT_LABEL,
 } from './dashboard-nav-items';
+import { PublicHeaderNav } from './PublicHeaderNav';
 
 /**
  * AppTopbar - Utility topbar cho authenticated area
@@ -72,7 +74,7 @@ export function AppTopbar({ onMenuClick, action, searchPlaceholder = 'Tìm nhanh
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-full items-center justify-between gap-4 px-4">
-        {/* Left side: Mobile menu + breadcrumb + search */}
+        {/* Left side: Mobile menu + public navigation + breadcrumb + search */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* Mobile menu trigger */}
           <button
@@ -82,6 +84,8 @@ export function AppTopbar({ onMenuClick, action, searchPlaceholder = 'Tìm nhanh
           >
             <Menu className="h-5 w-5" />
           </button>
+
+          <PublicHeaderNav className="hidden lg:flex" showLogin={!user} />
 
           {/* Breadcrumb */}
           <div className="min-w-0 shrink-0">
@@ -186,7 +190,7 @@ export function AppTopbar({ onMenuClick, action, searchPlaceholder = 'Tìm nhanh
                   className="flex items-center gap-3 text-destructive focus:text-destructive cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
-                  Đăng xuất
+                  {LOGOUT_LABEL}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

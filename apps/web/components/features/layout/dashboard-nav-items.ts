@@ -30,6 +30,49 @@ export type NavigationGroup = {
   items: NavigationItem[];
 };
 
+export const DASHBOARD_ROOT_LABEL = 'Tổng quan';
+export const CRUD_ROUTE_LABELS = {
+  create: 'Tạo mới',
+  edit: 'Chỉnh sửa',
+} as const;
+export const LOGOUT_LABEL = 'Đăng xuất';
+
+export const publicNavigationItems: NavigationItem[] = [
+  {
+    title: 'Tin tức',
+    href: '/',
+    icon: Newspaper,
+    match: ['/'],
+  },
+  {
+    title: 'Tài liệu',
+    href: '/documents',
+    icon: FileText,
+    match: ['/documents'],
+  },
+];
+
+function getAllNavigationItems(role?: string, canApproveUsers?: boolean): NavigationItem[] {
+  return [...publicNavigationItems, ...getNavigationGroups(role, canApproveUsers).flatMap((group) => group.items)];
+}
+
+export function getRouteLabel(segment: string, role?: string, canApproveUsers?: boolean): string | null {
+  if (segment === 'dashboard') {
+    return DASHBOARD_ROOT_LABEL;
+  }
+
+  if (segment in CRUD_ROUTE_LABELS) {
+    return CRUD_ROUTE_LABELS[segment as keyof typeof CRUD_ROUTE_LABELS];
+  }
+
+  const matchedItem = getAllNavigationItems(role, canApproveUsers).find((item) => {
+    const hrefSegment = item.href.split('/').filter(Boolean).at(-1);
+    return hrefSegment === segment;
+  });
+
+  return matchedItem?.title ?? null;
+}
+
 /**
  * Sidebar navigation groups cho authenticated area
  *

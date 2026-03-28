@@ -1,9 +1,10 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import Link from 'next/link';
 import { NewsList } from '@/components/news/NewsList';
 import { FeaturedNews } from '@/components/news/FeaturedNews';
+import { AppBrand } from '@/components/features/layout/AppBrand';
+import { PublicHeaderNav } from '@/components/features/layout/PublicHeaderNav';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileText, BookOpen, Users, Newspaper, Mail, Rss } from 'lucide-react';
 
@@ -37,36 +38,14 @@ export default function HomePage() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md group-hover:bg-primary/30 transition-colors" />
-              <div className="relative h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-teal-600 flex items-center justify-center shadow-sm">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-display font-bold text-xl text-foreground">
-                Kho Học Liệu Số
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Nền tảng chia sẻ kiến thức
-              </span>
-            </div>
-          </Link>
+          <AppBrand
+            href="/"
+            title="Kho Học Liệu Số"
+            subtitle="Nền tảng chia sẻ kiến thức"
+            titleClassName="text-xl"
+          />
 
-          <nav className="flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium text-primary">
-              Tin tức
-            </Link>
-            <Link href="/documents" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-              Tài liệu
-            </Link>
-            <Link href="/login">
-              <Button variant="gradient" size="sm">
-                Đăng nhập
-              </Button>
-            </Link>
-          </nav>
+          <PublicHeaderNav />
         </div>
       </header>
 

@@ -4,22 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const routeLabels: Record<string, string> = {
-  dashboard: 'Tổng quan',
-  documents: 'Tài liệu',
-  upload: 'Tải lên',
-  'rust-docs': 'Rust Inspector',
-  'my-documents': 'Tài liệu của tôi',
-  'my-news': 'Bài viết của tôi',
-  create: 'Tạo mới',
-  edit: 'Chỉnh sửa',
-  profile: 'Hồ sơ',
-  'change-password': 'Đổi mật khẩu',
-  admin: 'Quản trị',
-  news: 'Tin tức',
-  categories: 'Danh mục',
-};
+import { DASHBOARD_ROOT_LABEL, getRouteLabel } from './dashboard-nav-items';
 
 export function DashboardBreadcrumb() {
   const pathname = usePathname();
@@ -31,7 +16,7 @@ export function DashboardBreadcrumb() {
 
   const items = segments.map((segment, index) => {
     const href = `/${segments.slice(0, index + 1).join('/')}`;
-    const label = routeLabels[segment] || prettifySegment(segment);
+    const label = getRouteLabel(segment) || prettifySegment(segment);
     const isLast = index === segments.length - 1;
 
     return {
@@ -51,7 +36,7 @@ export function DashboardBreadcrumb() {
         className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
       >
         <Home className="h-3.5 w-3.5" />
-        <span>Dashboard</span>
+        <span>{DASHBOARD_ROOT_LABEL}</span>
       </Link>
 
       {items.map((item) => (
