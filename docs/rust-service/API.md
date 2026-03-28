@@ -5,7 +5,7 @@ Tài liệu này mô tả API hiện tại của `services/rust-doc-service`.
 Base URL local mặc định:
 
 ```text
-http://127.0.0.1:4001
+http://127.0.0.1:3001
 ```
 
 ## 1. `GET /health`
@@ -257,6 +257,174 @@ Lý do:
 - frontend đi thẳng vào Rust V2
 - Rust dùng lại cùng JWT secret và cùng SQLite hiện tại
 - `packages/data` chỉ còn giữ Prisma schema, seed và dữ liệu SQLite dùng chung
+
+## 8. Folder permissions API
+
+Tính năng này cho phép owner của thư mục cấp quyền upload cho user khác.
+
+### Quy tắc nghiệp vụ
+
+- chỉ owner của thư mục mới được grant/revoke permission
+- không thể grant quyền cho chính mình
+- quyền upload được kế thừa từ thư mục cha xuống thư mục con
+- user được cấp quyền upload **không** trở thành owner của thư mục
+- document được upload vẫn thuộc về **người upload**, không phải owner của folder
+
+### `GET /v2/users/search?q=<email>`
+
+Mục đích: tìm user theo email để chuẩn bị grant quyền upload.
+
+Yêu cầu auth:
+
+- `Authorization: Bearer <token>`
+
+Ví dụ:
+
+```bash
+curl "http://127.0.0.1:3001/v2/users/search?q=user@example.com" \
+  -H "Authorization: Bearer <token>"
+```
+
+Response `200 OK`:
+
+```json
+[
+  {
+    "id": "user-uuid",
+    "full_name": "Nguyen Van A",
+    "email": "user@example.com"
+  }
+]
+```
+
+### `GET /v2/folders/{id}/permissions`
+
+Mục đích: lấy danh sách user đang được cấp quyền trên folder.
+
+Yêu cầu auth:
+
+- owner của folder
+
+Ví dụ:
+
+```bash
+curl "http://127.0.0.1:3001/v2/folders/<folder-id>/permissions" \
+  -H "Authorization: Bearer <owner-token>"
+```
+
+Response `200 OK`:
+
+```json
+[
+  {
+    "id": "permission-uuid",
+    "folderId": "folder-uuid",
+    "user": {
+      "id": "user-uuid",
+      "fullName": "Nguyen Van A",
+      "email": "user@example.com"
+    },
+    "canUpload": true,
+    "grantedBy": {
+      "id": "owner-uuid",
+      "fullName": "Folder Owner",
+      "email": null
+    },
+    "grantedAt": "1743153490000"
+  }
+]
+```
+
+### `POST /v2/folders/{id}/permissions`
+
+Mục đích: cấp quyền upload cho user trên folder.
+
+Yêu cầu auth:
+
+- owner của folder
+
+Request body:
+
+```json
+{
+  "userId": "user-uuid",
+  "canUpload": true
+}
+```
+
+Ví dụ:
+
+```bash
+curl -X POST "http://127.0.0.1:3001/v2/folders/<folder-id>/permissions" \
+  -H "Authorization: Bearer <owner-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-uuid","canUpload":true}'
+```
+
+Response `200 OK`:
+
+```json
+{
+  "id": "permission-uuid",
+  "folderId": "folder-uuid",
+  "user": {
+    "id": "user-uuid",
+    "fullName": "Nguyen Van A",
+    "email": "user@example.com"
+  },
+  "canUpload": true,
+  "grantedBy": {
+    "id": "owner-uuid",
+    "fullName": "Folder Owner",
+    "email": null
+  },
+  "grantedAt": "1743153490000"
+}
+```
+
+### `DELETE /v2/folders/{id}/permissions/{permissionId}`
+
+Mục đích: thu hồi quyền upload đã cấp.
+
+Yêu cầu auth:
+
+- owner của folder
+
+Ví dụ:
+
+```bash
+curl -X DELETE "http://127.0.0.1:3001/v2/folders/<folder-id>/permissions/<permission-id>" \
+  -H "Authorization: Bearer <owner-token>"
+```
+
+Response `204 No Content`
+
+### Hành vi upload sau khi cấp quyền
+
+Endpoint upload document vẫn là:
+
+```text
+POST /v2/documents
+```
+
+Behavior hiện tại:
+
+- user không có quyền upload vào folder sẽ nhận `403 FORBIDDEN`
+- sau khi được grant `canUpload: true`, user có thể upload vào folder đó
+- quyền grant ở thư mục cha sẽ cho phép upload vào thư mục con
+- response folder hiện có thêm field `userPermission`
+
+Ví dụ field mới trong folder response:
+
+```json
+{
+  "id": "folder-uuid",
+  "name": "Shared Folder",
+  "userPermission": {
+    "canUpload": true
+  }
+}
+```
 
 ## 8. Auth V2 API
 

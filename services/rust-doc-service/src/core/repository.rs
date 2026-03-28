@@ -2,7 +2,7 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
-    accounts::{ProfileCount, ProfileResponse, UserRecord},
+    accounts::{ProfileCount, ProfileResponse, UserRecord, UserSearchResult},
     documents::{CreateDocumentPayload, DocumentRecord, UpdateDocumentPayload, UploadedDocumentFile},
     folders::{CreateFolderPayload, FolderRecord, UpdateFolderPayload},
     inspection::FileInspectionResult,
@@ -11,6 +11,7 @@ use crate::{
         CreateCategoryPayload, CreateNewsPayload, ListNewsQuery, NewsCategoryRecord, NewsRecord,
         UpdateCategoryPayload, UpdateNewsPayload,
     },
+    permissions::{GrantPermissionPayload, PermissionRecord},
 };
 
 #[cfg(test)]
@@ -2122,4 +2123,265 @@ fn map_news_row(row: NewsRow) -> NewsRecord {
         user_name: row.user_name,
         user_avatar_url: row.user_avatar_url,
     }
+}
+
+pub async fn grant_folder_permission(
+    pool: &SqlitePool,
+    folder_id: &str,
+    granter_id: &str,
+    payload: &GrantPermissionPayload,
+) -> Result<PermissionRecord, sqlx::Error> {
+    let id = Uuid::new_v4().to_string();
+    let now = current_timestamp_millis().to_string();
+
+    sqlx::query(
+        r#"
+        INSERT INTO folder_permissions (id, folder_id, user_id, can_upload, granted_by, granted_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(folder_id, user_id) DO UPDATE SET
+            can_upload = excluded.can_upload,
+            granted_by = excluded.granted_by,
+            granted_at = excluded.granted_at
+        "#,
+    )
+    .bind(&id)
+    .bind(folder_id)
+    .bind(&payload.user_id)
+    .bind(payload.can_upload)
+    .bind(granter_id)
+    .bind(&now)
+    .execute(pool)
+    .await?;
+
+    find_permission_by_folder_and_user(pool, folder_id, &payload.user_id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
+}
+
+pub async fn find_permission_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<PermissionRecord>, sqlx::Error> {
+    sqlx::query_as::<_, PermissionRecord>(
+        r#"
+        SELECT
+            fp.id, fp.folder_id, fp.user_id, fp.can_upload, fp.granted_by, fp.granted_at,
+            u."fullName" as user_name,
+            u.email as user_email,
+            g."fullName" as granted_by_name
+        FROM folder_permissions fp
+        INNER JOIN users u ON u.id = fp.user_id
+        INNER JOIN users g ON g.id = fp.granted_by
+        WHERE fp.id = ?
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn find_permission_by_folder_and_user(
+    pool: &SqlitePool,
+    folder_id: &str,
+    user_id: &str,
+) -> Result<Option<PermissionRecord>, sqlx::Error> {
+    sqlx::query_as::<_, PermissionRecord>(
+        r#"
+        SELECT
+            fp.id, fp.folder_id, fp.user_id, fp.can_upload, fp.granted_by, fp.granted_at,
+            u."fullName" as user_name,
+            u.email as user_email,
+            g."fullName" as granted_by_name
+        FROM folder_permissions fp
+        INNER JOIN users u ON u.id = fp.user_id
+        INNER JOIN users g ON g.id = fp.granted_by
+        WHERE fp.folder_id = ? AND fp.user_id = ?
+        "#,
+    )
+    .bind(folder_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn list_folder_permissions(
+    pool: &SqlitePool,
+    folder_id: &str,
+) -> Result<Vec<PermissionRecord>, sqlx::Error> {
+    sqlx::query_as::<_, PermissionRecord>(
+        r#"
+        SELECT
+            fp.id, fp.folder_id, fp.user_id, fp.can_upload, fp.granted_by, fp.granted_at,
+            u."fullName" as user_name,
+            u.email as user_email,
+            g."fullName" as granted_by_name
+        FROM folder_permissions fp
+        INNER JOIN users u ON u.id = fp.user_id
+        INNER JOIN users g ON g.id = fp.granted_by
+        WHERE fp.folder_id = ?
+        ORDER BY u."fullName"
+        "#,
+    )
+    .bind(folder_id)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn revoke_folder_permission(
+    pool: &SqlitePool,
+    permission_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM folder_permissions WHERE id = ?")
+        .bind(permission_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn can_upload_to_folder(
+    pool: &SqlitePool,
+    user_id: &str,
+    folder_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let folder = find_folder_by_id(pool, folder_id).await?;
+    if let Some(f) = &folder {
+        if f.user_id == user_id {
+            return Ok(true);
+        }
+    }
+
+    let has_direct: bool = sqlx::query_scalar(
+        r#"
+        SELECT can_upload FROM folder_permissions
+        WHERE folder_id = ? AND user_id = ? AND can_upload = 1
+        "#,
+    )
+    .bind(folder_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?
+    .unwrap_or(false);
+
+    if has_direct {
+        return Ok(true);
+    }
+
+    if let Some(ref parent_id) = folder.as_ref().and_then(|f| f.parent_id.clone()) {
+        let mut current_id = parent_id.clone();
+        loop {
+            let parent = find_folder_by_id(pool, &current_id).await?;
+            let Some(p) = parent else {
+                break;
+            };
+
+            if p.status == "DELETED" {
+                break;
+            }
+
+            let inherited: bool = sqlx::query_scalar(
+                r#"
+                SELECT can_upload FROM folder_permissions
+                WHERE folder_id = ? AND user_id = ? AND can_upload = 1
+                "#,
+            )
+            .bind(&current_id)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?
+            .unwrap_or(false);
+
+            if inherited {
+                return Ok(true);
+            }
+
+            current_id = match p.parent_id {
+                Some(pid) => pid,
+                None => break,
+            };
+        }
+    }
+
+    Ok(false)
+}
+
+pub async fn get_user_folder_permission(
+    pool: &SqlitePool,
+    user_id: &str,
+    folder_id: &str,
+) -> Result<Option<bool>, sqlx::Error> {
+    let folder = find_folder_by_id(pool, folder_id).await?;
+    if let Some(f) = &folder {
+        if f.user_id == user_id {
+            return Ok(Some(true));
+        }
+    }
+
+    let can_upload: Option<bool> = sqlx::query_scalar(
+        r#"
+        SELECT can_upload FROM folder_permissions
+        WHERE folder_id = ? AND user_id = ?
+        "#,
+    )
+    .bind(folder_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    if can_upload.is_some() {
+        return Ok(can_upload);
+    }
+
+    if let Some(ref parent_id) = folder.as_ref().and_then(|f| f.parent_id.clone()) {
+        let mut current_id = parent_id.clone();
+        loop {
+            let parent = find_folder_by_id(pool, &current_id).await?;
+            let Some(p) = parent else {
+                break;
+            };
+
+            let inherited: Option<bool> = sqlx::query_scalar(
+                r#"
+                SELECT can_upload FROM folder_permissions
+                WHERE folder_id = ? AND user_id = ?
+                "#,
+            )
+            .bind(&current_id)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+
+            if inherited.unwrap_or(false) {
+                return Ok(Some(true));
+            }
+
+            current_id = match p.parent_id {
+                Some(pid) => pid,
+                None => break,
+            };
+        }
+    }
+
+    Ok(None)
+}
+
+pub async fn search_users_by_email(
+    pool: &SqlitePool,
+    query: &str,
+    current_user_id: &str,
+) -> Result<Vec<UserSearchResult>, sqlx::Error> {
+    sqlx::query_as::<_, UserSearchResult>(
+        r#"
+        SELECT id, "fullName" as full_name, email
+        FROM users
+        WHERE email LIKE ?
+          AND id != ?
+          AND status = 'ACTIVE'
+        ORDER BY "fullName"
+        LIMIT 10
+        "#,
+    )
+    .bind(format!("%{}%", query))
+    .bind(current_user_id)
+    .fetch_all(pool)
+    .await
 }

@@ -5,10 +5,15 @@ pub mod health;
 pub mod inspect;
 pub mod inspections;
 pub mod news;
+pub mod permissions;
 pub mod upload;
 pub mod users;
 
-use axum::{extract::DefaultBodyLimit, routing::{get, patch, post, put}, Router};
+use axum::{
+    extract::DefaultBodyLimit,
+    routing::{delete, get, patch, post, put},
+    Router,
+};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::core::app_state::AppState;
@@ -53,6 +58,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v2/folders/{id}", get(folders::get_folder_detail_handler).put(folders::update_folder_handler).delete(folders::delete_folder_handler))
         .route("/v2/folders/{id}/breadcrumbs", get(folders::get_folder_breadcrumbs_handler))
         .route("/v2/folders/{id}/children", get(folders::get_folder_children_handler))
+        .route("/v2/folders/{id}/permissions", get(permissions::list_permissions_handler).post(permissions::grant_permission_handler))
+        .route("/v2/folders/{id}/permissions/{permissionId}", delete(permissions::revoke_permission_handler))
+        .route("/v2/users/search", get(users::search_users_handler))
         .with_state(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

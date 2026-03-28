@@ -6,9 +6,11 @@ use crate::{
     auth::{ensure_can_access_document, ensure_can_manage_document, CurrentUser},
     error::{AppError, AppResult},
     folders::{CreateFolderPayload, FolderResponse, UpdateFolderPayload},
+    permissions::UserPermissionSummary,
     repository::{
-        create_folder, find_folder_by_id, find_folder_by_name_and_parent, get_folder_breadcrumbs, is_descendant_folder, list_folders,
-        soft_delete_folder, update_folder,
+        create_folder, find_folder_by_id, find_folder_by_name_and_parent, get_folder_breadcrumbs,
+        get_user_folder_permission, is_descendant_folder, list_folders, soft_delete_folder,
+        update_folder,
     },
 };
 
@@ -24,8 +26,21 @@ pub async fn list_folders_handler(
 ) -> AppResult<Json<Vec<FolderResponse>>> {
     let current_user = current_user.user();
     let items = list_folders(&state.db_pool, &current_user.id, &current_user.role, None).await?;
+    let mut responses = Vec::with_capacity(items.len());
 
-    Ok(Json(items.into_iter().map(|item| item.into_response()).collect()))
+    for item in items {
+        let folder_id = item.id.clone();
+        let response = enrich_folder_with_permission(
+            &state.db_pool,
+            &current_user.id,
+            &folder_id,
+            item.into_response(),
+        )
+        .await;
+        responses.push(response);
+    }
+
+    Ok(Json(responses))
 }
 
 pub async fn get_folder_tree_handler(
@@ -41,7 +56,21 @@ pub async fn get_folder_tree_handler(
         None,
     )
     .await?;
-    let tree = build_folder_tree(folders, query.parent_id.as_deref());
+    let mut permission_map: HashMap<String, UserPermissionSummary> = HashMap::new();
+    for folder in &folders {
+        if let Ok(Some(can_upload)) =
+            get_user_folder_permission(&state.db_pool, &current_user.id, &folder.id).await
+        {
+            permission_map.insert(
+                folder.id.clone(),
+                UserPermissionSummary {
+                    canUpload: can_upload,
+                },
+            );
+        }
+    }
+
+    let tree = build_folder_tree(folders, query.parent_id.as_deref(), &permission_map);
 
     Ok(Json(tree))
 }
@@ -61,8 +90,16 @@ pub async fn get_folder_detail_handler(
     }
 
     ensure_can_access_document(&current_user, &folder.user_id, folder.is_public)?;
+    let folder_id = folder.id.clone();
+    let response = enrich_folder_with_permission(
+        &state.db_pool,
+        &current_user.id,
+        &folder_id,
+        folder.into_response(),
+    )
+    .await;
 
-    Ok(Json(folder.into_response()))
+    Ok(Json(response))
 }
 
 pub async fn get_folder_breadcrumbs_handler(
@@ -72,12 +109,22 @@ pub async fn get_folder_breadcrumbs_handler(
 ) -> AppResult<Json<Vec<FolderResponse>>> {
     let current_user = current_user.user();
     let breadcrumbs = get_folder_breadcrumbs(&state.db_pool, &id).await?;
+    let mut responses = Vec::with_capacity(breadcrumbs.len());
 
-    for folder in &breadcrumbs {
+    for folder in breadcrumbs {
         ensure_can_access_document(&current_user, &folder.user_id, folder.is_public)?;
+        let folder_id = folder.id.clone();
+        let response = enrich_folder_with_permission(
+            &state.db_pool,
+            &current_user.id,
+            &folder_id,
+            folder.into_response(),
+        )
+        .await;
+        responses.push(response);
     }
 
-    Ok(Json(breadcrumbs.into_iter().map(|item| item.into_response()).collect()))
+    Ok(Json(responses))
 }
 
 pub async fn get_folder_children_handler(
@@ -87,8 +134,21 @@ pub async fn get_folder_children_handler(
 ) -> AppResult<Json<Vec<FolderResponse>>> {
     let current_user = current_user.user();
     let items = list_folders(&state.db_pool, &current_user.id, &current_user.role, Some(&id)).await?;
+    let mut responses = Vec::with_capacity(items.len());
 
-    Ok(Json(items.into_iter().map(|item| item.into_response()).collect()))
+    for item in items {
+        let folder_id = item.id.clone();
+        let response = enrich_folder_with_permission(
+            &state.db_pool,
+            &current_user.id,
+            &folder_id,
+            item.into_response(),
+        )
+        .await;
+        responses.push(response);
+    }
+
+    Ok(Json(responses))
 }
 
 pub async fn create_folder_handler(
@@ -122,7 +182,7 @@ pub async fn create_folder_handler(
         &current_user.id,
     )
     .await
-    .map_err(|e| AppError::Database(e))?;
+    .map_err(AppError::Database)?;
 
     if existing.is_some() {
         return Err(AppError::Conflict(
@@ -190,6 +250,7 @@ pub async fn delete_folder_handler(
 fn build_folder_tree(
     folders: Vec<crate::folders::FolderRecord>,
     parent_id: Option<&str>,
+    permissions: &HashMap<String, UserPermissionSummary>,
 ) -> Vec<FolderResponse> {
     let mut by_parent: HashMap<Option<String>, Vec<crate::folders::FolderRecord>> = HashMap::new();
 
@@ -200,6 +261,7 @@ fn build_folder_tree(
     fn assemble(
         by_parent: &mut HashMap<Option<String>, Vec<crate::folders::FolderRecord>>,
         parent_id: Option<String>,
+        permissions: &HashMap<String, UserPermissionSummary>,
     ) -> Vec<FolderResponse> {
         let mut items = by_parent.remove(&parent_id).unwrap_or_default();
         items.sort_by(|a, b| a.name.cmp(&b.name));
@@ -209,11 +271,29 @@ fn build_folder_tree(
             .map(|folder| {
                 let folder_id = folder.id.clone();
                 let mut response = folder.into_response();
-                response.children = Some(assemble(by_parent, Some(folder_id)));
+                if let Some(permission) = permissions.get(&folder_id) {
+                    response.userPermission = Some(permission.clone());
+                }
+                response.children = Some(assemble(by_parent, Some(folder_id), permissions));
                 response
             })
             .collect()
     }
 
-    assemble(&mut by_parent, parent_id.map(ToOwned::to_owned))
+    assemble(&mut by_parent, parent_id.map(ToOwned::to_owned), permissions)
+}
+
+async fn enrich_folder_with_permission(
+    pool: &sqlx::SqlitePool,
+    user_id: &str,
+    folder_id: &str,
+    mut response: FolderResponse,
+) -> FolderResponse {
+    if let Ok(Some(can_upload)) = get_user_folder_permission(pool, user_id, folder_id).await {
+        response.userPermission = Some(UserPermissionSummary {
+            canUpload: can_upload,
+        });
+    }
+
+    response
 }

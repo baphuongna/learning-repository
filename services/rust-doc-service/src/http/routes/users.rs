@@ -4,11 +4,13 @@ use axum::{
 };
 
 use crate::{
-    accounts::AdminUserResponse,
+    accounts::{AdminUserResponse, UserSearchResult},
     app_state::AppState,
     auth::{AuthUser, CurrentUser},
     error::{AppError, AppResult},
-    repository::{approve_user, find_user_by_id, list_users_for_admin, reject_user},
+    repository::{
+        approve_user, find_user_by_id, list_users_for_admin, reject_user, search_users_by_email,
+    },
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -20,6 +22,27 @@ pub struct ListUsersQuery {
 #[derive(Debug, serde::Deserialize)]
 pub struct RejectUserPayload {
     pub reason: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct UserSearchQuery {
+    pub q: Option<String>,
+}
+
+pub async fn search_users_handler(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Query(query): Query<UserSearchQuery>,
+) -> AppResult<Json<Vec<UserSearchResult>>> {
+    let current_user = current_user.user();
+    let q = query.q.unwrap_or_default();
+    let q = q.trim().to_string();
+
+    let results = search_users_by_email(&state.db_pool, &q, &current_user.id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(results))
 }
 
 pub async fn list_users_handler(

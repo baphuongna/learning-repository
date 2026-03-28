@@ -29,6 +29,10 @@ mod domains {
     pub mod news {
         pub mod models;
     }
+
+    pub mod permissions {
+        pub mod models;
+    }
 }
 
 mod http {
@@ -48,6 +52,7 @@ pub use domains::documents::models as documents;
 pub use domains::folders::models as folders;
 pub use domains::inspection::service as inspection;
 pub use domains::news::models as news;
+pub use domains::permissions::models as permissions;
 pub use http::routes as routes;
 #[cfg(test)]
 mod tests;

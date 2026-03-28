@@ -19,7 +19,7 @@ use crate::{
     inspection::{inspect_uploaded_file, UploadedFile},
     repository::{
         cascade_folder_private_if_empty, cascade_folder_public_status, create_document, find_document_by_id,
-        find_folder_by_id, insert_inspection_history, list_documents, soft_delete_document, update_document,
+        insert_inspection_history, list_documents, soft_delete_document, update_document,
     },
     storage::persist_uploaded_file,
 };
@@ -250,14 +250,14 @@ pub async fn create_document_handler(
         "document upload multipart parsing completed"
     );
 
-    // Validate folder ownership - user chỉ có thể upload vào folder của mình
+    // Validate upload permission for selected folder
     let folder_id_normalized = normalize_optional_text(folder_id.clone());
     if let Some(ref fid) = folder_id_normalized {
-        let folder = crate::repository::find_folder_by_id(&state.db_pool, fid)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Thư mục không tồn tại".to_string()))?;
-        
-        if folder.user_id != current_user.id {
+        let can_upload = crate::repository::can_upload_to_folder(&state.db_pool, &current_user.id, fid)
+            .await
+            .map_err(AppError::Database)?;
+
+        if !can_upload {
             return Err(AppError::Forbidden(
                 "Bạn không có quyền upload file vào thư mục này".to_string(),
             ));

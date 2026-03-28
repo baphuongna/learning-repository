@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::permissions::UserPermissionSummary;
+
 #[derive(Debug, Clone)]
 pub struct FolderRecord {
     pub id: String,
@@ -49,6 +51,7 @@ pub struct FolderResponse {
     pub user: Option<FolderUserSummary>,
     pub children: Option<Vec<FolderResponse>>,
     pub _count: FolderCountSummary,
+    pub userPermission: Option<UserPermissionSummary>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +97,7 @@ impl FolderRecord {
                 documents: self.documents_count,
                 children: self.children_count,
             },
+            userPermission: None,
         }
     }
 }

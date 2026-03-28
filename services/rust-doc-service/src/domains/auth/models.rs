@@ -70,6 +70,14 @@ pub struct AdminUserResponse {
     pub createdAt: String,
 }
 
+#[derive(Debug, sqlx::FromRow, Serialize)]
+#[allow(non_snake_case)]
+pub struct UserSearchResult {
+    pub id: String,
+    pub full_name: String,
+    pub email: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ProfileCount {
     pub documents: i64,

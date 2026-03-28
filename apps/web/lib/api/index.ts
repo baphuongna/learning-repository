@@ -4,11 +4,13 @@ export { documentsApi } from './documents';
 export { foldersApi } from './folders';
 export { categoriesApi, newsApi } from './news';
 export { rustDocsApi } from './rust-docs';
+export { permissionsApi, usersSearchApi } from './permissions';
 
 export type {
   User,
   Document,
   Folder,
+  FolderPermission,
   PaginatedResponse,
   InspectionHistory,
   FileInspectionResult,

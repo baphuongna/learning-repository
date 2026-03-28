@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Folder, foldersApi } from '@/lib/api';
-import { ChevronRight, Folder as FolderIcon, Loader2, FolderOpen, FolderTree as FolderTreeIcon } from 'lucide-react';
+import { ChevronRight, Folder as FolderIcon, Loader2, FolderOpen, FolderTree as FolderTreeIcon, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FolderActions } from './FolderActions';
+import { useAuth } from '@/app/providers';
 
 interface FolderTreeProps {
   currentFolderId: string | null;
@@ -16,6 +17,7 @@ const INDENT_SIZE = 16;
 const BASE_PADDING = 8;
 
 export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps) {
+  const { user } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -149,6 +151,12 @@ export function FolderTree({ currentFolderId, onSelectFolder }: FolderTreeProps)
             )}>
               {folder.name}
             </span>
+            {/* Shield indicator for folders with upload permission */}
+            {folder.userId !== user?.id && folder.userPermission?.canUpload && (
+              <span title="Có quyền upload" className="ml-1">
+                <Shield className="h-3 w-3 text-blue-500" />
+              </span>
+            )}
             {/* Document count badge */}
             {folder._count && folder._count.documents > 0 && (
               <span className={cn(

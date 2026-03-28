@@ -91,6 +91,23 @@ export interface Document {
   };
 }
 
+export interface FolderPermission {
+  id: string;
+  folderId: string;
+  user: {
+    id: string;
+    fullName: string;
+    email: string | null;
+  };
+  canUpload: boolean;
+  grantedBy: {
+    id: string;
+    fullName: string;
+    email?: string | null;
+  };
+  grantedAt: string;
+}
+
 export interface Folder {
   id: string;
   name: string;
@@ -112,6 +129,9 @@ export interface Folder {
     documents: number;
     children: number;
   };
+  userPermission?: {
+    canUpload: boolean;
+  } | null;
 }
 
 export interface PaginatedResponse<T> {
