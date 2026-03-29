@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Folder as FolderType, FolderPermission } from '@/lib/api';
 import { foldersApi, permissionsApi, usersSearchApi } from '@/lib/api';
 import { useAuth } from '@/app/providers';
-import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2, FileText, User, Shield, X, Search } from 'lucide-react';
+import { Folder as FolderIcon, MoreHorizontal, FolderPlus, Pencil, Trash2, Loader2, FileText, User, Shield, X, Search, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -443,8 +444,10 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
     </>
   );
 
-  // Render dropdown menu
-  const renderDropdownMenu = () => (
+  // Render dropdown menu - only available for folder owners
+  const renderDropdownMenu = () => {
+    if (!isOwner) return null;
+    return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -480,22 +483,17 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
           <Pencil className="h-4 w-4" />
           Đổi tên
         </DropdownMenuItem>
-        {/* Permission management - only for owners */}
-        {isOwner && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePermissionsDialogOpen(true);
-              }}
-              className="gap-2"
-            >
-              <Shield className="h-4 w-4" />
-              Quản lý quyền truy cập
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePermissionsDialogOpen(true);
+          }}
+          className="gap-2"
+        >
+          <Shield className="h-4 w-4" />
+          Quản lý quyền truy cập
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={(e) => {
@@ -509,7 +507,8 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+    );
+  };
 
   // Grid view - Google Drive style
   if (viewMode === 'grid') {
@@ -543,6 +542,13 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
             <span className="font-medium text-sm truncate w-full px-1 text-foreground">
               {folder.name}
             </span>
+
+            {/* Shared badge - shown for non-owner folders */}
+            {!isOwner && (
+              <Badge variant="info" size="sm" className="mt-1" icon={<Share2 className="h-3 w-3" />}>
+                Được chia sẻ
+              </Badge>
+            )}
 
             {/* Document count */}
             {folder._count && (
@@ -587,6 +593,13 @@ export function FolderItem({ folder, viewMode, onOpen, onRefresh }: FolderItemPr
         <span className="font-medium flex-1 truncate text-foreground">
           {folder.name}
         </span>
+
+        {/* Shared badge - shown for non-owner folders */}
+        {!isOwner && (
+          <Badge variant="info" size="sm" icon={<Share2 className="h-3 w-3" />}>
+            Được chia sẻ
+          </Badge>
+        )}
 
         {/* Owner name - always show */}
         {folder.user && (

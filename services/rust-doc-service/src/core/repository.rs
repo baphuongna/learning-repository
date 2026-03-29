@@ -532,7 +532,17 @@ pub async fn list_folders(
                 FROM folders c
                 WHERE c.parent_id = f.id 
                   AND c.status = 'ACTIVE'
-                  AND (c.user_id = ? OR c.is_public = 1)
+                  AND (
+                    c.user_id = ?
+                    OR c.is_public = 1
+                    OR EXISTS (
+                      SELECT 1
+                      FROM folder_permissions cfp
+                      WHERE cfp.folder_id = c.id
+                        AND cfp.user_id = ?
+                        AND cfp.can_upload = 1
+                    )
+                  )
             ) AS children_count
         FROM folders f
         INNER JOIN users u ON u.id = f.user_id
@@ -561,6 +571,13 @@ pub async fn list_folders(
                 )
               )
             )
+            OR EXISTS (
+              SELECT 1
+              FROM folder_permissions fp
+              WHERE fp.folder_id = f.id
+                AND fp.user_id = ?
+                AND fp.can_upload = 1
+            )
           )
           AND (
             ? IS NULL
@@ -570,6 +587,8 @@ pub async fn list_folders(
         ORDER BY f.name ASC
         "#,
     )
+    .bind(current_user_id)
+    .bind(current_user_id)
     .bind(current_user_id)
     .bind(current_user_id)
     .bind(current_user_id)

@@ -61,6 +61,16 @@ mod tests {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE folder_permissions (
+                id TEXT PRIMARY KEY,
+                folder_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                can_upload BOOLEAN NOT NULL DEFAULT 0,
+                granted_by TEXT NOT NULL,
+                granted_at TEXT NOT NULL,
+                UNIQUE(folder_id, user_id)
+            );
+
             CREATE TABLE documents (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -1472,5 +1482,154 @@ mod tests {
             .expect("cascade should not fail for nonexistent folder");
 
         assert!(affected.is_empty(), "should return empty list for nonexistent folder");
+    }
+
+    #[tokio::test]
+    async fn folder_listings_include_shared_folders_with_upload_permission() {
+        let pool = setup_test_db().await;
+        let owner = create_user(&pool, "owner-folder@example.com", "Folder Owner", "hash")
+            .await
+            .expect("owner should be created");
+        let collaborator = create_user(
+            &pool,
+            "collab-folder@example.com",
+            "Folder Collaborator",
+            "hash",
+        )
+        .await
+        .expect("collaborator should be created");
+
+        create_folder_with_id(
+            &pool,
+            "shared-root",
+            &owner.id,
+            &CreateFolderPayload {
+                name: "Shared Root".to_string(),
+                description: Some("Shared by permission".to_string()),
+                color: Some("#123456".to_string()),
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("shared root should be created");
+
+        create_folder_with_id(
+            &pool,
+            "shared-child",
+            &owner.id,
+            &CreateFolderPayload {
+                name: "Shared Child".to_string(),
+                description: None,
+                color: Some("#654321".to_string()),
+                parent_id: Some("shared-root".to_string()),
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("shared child should be created");
+
+        create_folder_with_id(
+            &pool,
+            "own-root",
+            &collaborator.id,
+            &CreateFolderPayload {
+                name: "Own Root".to_string(),
+                description: None,
+                color: None,
+                parent_id: None,
+                is_public: Some(false),
+            },
+        )
+        .await
+        .expect("own root should be created");
+
+        sqlx::query(
+            r#"
+            INSERT INTO folder_permissions (id, folder_id, user_id, can_upload, granted_by, granted_at)
+            VALUES ('perm-shared-root', ?, ?, 1, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            "#,
+        )
+        .bind("shared-root")
+        .bind(&collaborator.id)
+        .bind(&owner.id)
+        .execute(&pool)
+        .await
+        .expect("root permission should be inserted");
+
+        sqlx::query(
+            r#"
+            INSERT INTO folder_permissions (id, folder_id, user_id, can_upload, granted_by, granted_at)
+            VALUES ('perm-shared-child', ?, ?, 1, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            "#,
+        )
+        .bind("shared-child")
+        .bind(&collaborator.id)
+        .bind(&owner.id)
+        .execute(&pool)
+        .await
+        .expect("child permission should be inserted");
+
+        let token = test_config()
+            .sign_jwt(&collaborator.id, &collaborator.email, &collaborator.role)
+            .expect("jwt should sign");
+        let app = create_test_app(pool);
+
+        let root_request = Request::builder()
+            .method("GET")
+            .uri("/v2/folders")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::empty())
+            .expect("request should build");
+
+        let root_response = app
+            .clone()
+            .oneshot(root_request)
+            .await
+            .expect("root list should respond");
+        assert_eq!(root_response.status(), StatusCode::OK);
+
+        let root_json = read_json(root_response).await;
+        let root_items = root_json
+            .as_array()
+            .expect("root response should be an array");
+
+        let shared_root = root_items
+            .iter()
+            .find(|item| item["id"] == "shared-root")
+            .expect("shared root should be visible to collaborator");
+        assert_eq!(shared_root["userId"], owner.id);
+        assert_eq!(shared_root["user"]["fullName"], owner.full_name);
+        assert_eq!(shared_root["userPermission"]["canUpload"], true);
+
+        let own_root = root_items
+            .iter()
+            .find(|item| item["id"] == "own-root")
+            .expect("own root should still be visible");
+        assert_eq!(own_root["userId"], collaborator.id);
+
+        let children_request = Request::builder()
+            .method("GET")
+            .uri("/v2/folders/shared-root/children")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::empty())
+            .expect("request should build");
+
+        let children_response = app
+            .oneshot(children_request)
+            .await
+            .expect("children list should respond");
+        assert_eq!(children_response.status(), StatusCode::OK);
+
+        let children_json = read_json(children_response).await;
+        let children_items = children_json
+            .as_array()
+            .expect("children response should be an array");
+        let shared_child = children_items
+            .iter()
+            .find(|item| item["id"] == "shared-child")
+            .expect("shared child should be visible to collaborator");
+        assert_eq!(shared_child["userId"], owner.id);
+        assert_eq!(shared_child["userPermission"]["canUpload"], true);
     }
 }
