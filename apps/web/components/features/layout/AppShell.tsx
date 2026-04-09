@@ -3,6 +3,7 @@
 import { ReactNode, useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { AppTopbar } from './AppTopbar';
+import { AIChatWidget } from '../ai/AIChatWidget';
 
 /**
  * AppShell - Layout wrapper cho authenticated area
@@ -68,6 +69,9 @@ export function AppShell({ children, userRole, action, searchPlaceholder }: AppS
           </div>
         </footer>
       </div>
+
+      {/* Floating AI Chat Widget */}
+      <AIChatWidget />
     </div>
   );
 }
