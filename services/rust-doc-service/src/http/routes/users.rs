@@ -4,12 +4,13 @@ use axum::{
 };
 
 use crate::{
-    accounts::{AdminUserResponse, UserSearchResult},
+    accounts::{AdminUserResponse, ResetPasswordPayload, UserSearchResult},
     app_state::AppState,
     auth::{AuthUser, CurrentUser},
     error::{AppError, AppResult},
     repository::{
         approve_user, find_user_by_id, list_users_for_admin, reject_user, search_users_by_email,
+        update_user_password,
     },
 };
 
@@ -90,6 +91,35 @@ pub async fn reject_user_handler(
         .ok_or_else(|| AppError::NotFound("Không tìm thấy người dùng".to_string()))?;
 
     Ok(Json(user.to_admin_user()))
+}
+
+pub async fn reset_password_handler(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Path(user_id): Path<String>,
+    Json(payload): Json<ResetPasswordPayload>,
+) -> AppResult<Json<serde_json::Value>> {
+    let current_user = current_user.user();
+    ensure_can_approve_users(&state, &current_user).await?;
+
+    if payload.newPassword.len() < 6 {
+        return Err(AppError::BadRequest(
+            "Mật khẩu mới phải có ít nhất 6 ký tự".to_string(),
+        ));
+    }
+
+    let user = find_user_by_id(&state.db_pool, &user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Không tìm thấy người dùng".to_string()))?;
+
+    let new_hash = bcrypt::hash(&payload.newPassword, 10)
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+
+    update_user_password(&state.db_pool, &user.id, &new_hash).await?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Đặt lại mật khẩu thành công"
+    })))
 }
 
 async fn ensure_can_approve_users(state: &AppState, current_user: &AuthUser) -> AppResult<()> {

@@ -111,6 +111,12 @@ pub struct ChangePasswordPayload {
     pub newPassword: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
+pub struct ResetPasswordPayload {
+    pub newPassword: String,
+}
+
 impl UserRecord {
     pub fn to_auth_user(&self) -> AuthUserResponse {
         AuthUserResponse {

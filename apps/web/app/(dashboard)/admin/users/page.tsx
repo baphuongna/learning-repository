@@ -8,7 +8,7 @@ import { ContextBar } from '@/components/features/layout/ContextBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, Loader2, Search, RefreshCw, Users, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Check, X, Loader2, Search, RefreshCw, Users, Clock, CheckCircle2, XCircle, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
 /**
@@ -81,6 +81,92 @@ function StatusFilterTabs({
 }
 
 /**
+ * Dialog đặt lại mật khẩu cho user (admin only)
+ */
+function ResetPasswordDialog({
+  user,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  user: AdminUser;
+  onClose: () => void;
+  onConfirm: (newPassword: string) => void;
+  loading: boolean;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const isValid = newPassword.length >= 6 && newPassword === confirmPassword;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-card border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Đặt lại mật khẩu</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          Đặt lại mật khẩu cho <strong>{user.fullName}</strong> ({user.email})
+        </p>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Mật khẩu mới</label>
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Ít nhất 6 ký tự"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Xác nhận mật khẩu</label>
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Nhập lại mật khẩu"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            {confirmPassword && newPassword !== confirmPassword && (
+              <p className="text-xs text-destructive">Mật khẩu không khớp</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Hủy
+          </Button>
+          <Button onClick={() => onConfirm(newPassword)} disabled={!isValid || loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
+            Đặt lại mật khẩu
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Admin Users Page - Quản lý phê duyệt người dùng
  *
  * Features:
@@ -95,6 +181,8 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<UserApprovalStatus | 'ALL'>('ALL');
   const [actioningUserId, setActioningUserId] = useState<string | null>(null);
+  const [resetUser, setResetUser] = useState<AdminUser | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchUsers();
@@ -200,6 +288,20 @@ export default function AdminUsersPage() {
       </div>,
       { duration: 10000 }
     );
+  };
+
+  const handleResetPassword = async (userId: string, newPassword: string) => {
+    try {
+      setResettingUserId(userId);
+      await usersApi.resetPassword(userId, newPassword);
+      toast.success('Đặt lại mật khẩu thành công');
+      setResetUser(null);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Không thể đặt lại mật khẩu');
+      toast.error(message);
+    } finally {
+      setResettingUserId(null);
+    }
   };
 
   const formatDate = (date: string) => {
@@ -412,6 +514,19 @@ export default function AdminUsersPage() {
                             )}
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setResetUser(user)}
+                          disabled={resettingUserId === user.id}
+                          title="Đặt lại mật khẩu"
+                        >
+                          {resettingUserId === user.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <KeyRound className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -434,6 +549,16 @@ export default function AdminUsersPage() {
               : 'Người dùng mới sẽ xuất hiện ở đây sau khi đăng ký'}
           </p>
         </div>
+      )}
+
+      {/* Reset Password Dialog */}
+      {resetUser && (
+        <ResetPasswordDialog
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onConfirm={(newPassword) => void handleResetPassword(resetUser.id, newPassword)}
+          loading={resettingUserId === resetUser.id}
+        />
       )}
     </div>
   );

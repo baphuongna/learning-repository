@@ -59,4 +59,13 @@ export const usersApi = {
     const response = await rustV2Api.patch<AdminUser>(`/admin/users/${userId}/reject`, { reason });
     return response.data;
   },
+
+  /**
+   * Admin đặt lại mật khẩu cho user khác
+   * PATCH /admin/users/:id/reset-password { newPassword }
+   */
+  resetPassword: async (userId: string, newPassword: string): Promise<{ message: string }> => {
+    const response = await rustV2Api.patch<{ message: string }>(`/admin/users/${userId}/reset-password`, { newPassword });
+    return response.data;
+  },
 };
